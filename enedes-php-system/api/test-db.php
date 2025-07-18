@@ -1,18 +1,24 @@
 <?php
-$dsn = "pgsql:host=ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech;port=5432;dbname=neondb;user=neondb_owner;password=npg_wX27Kvd9tRbe;sslmode=require;channel_binding=require";
+$host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
+$db   = 'neondb';
+$user = 'neondb_owner';
+$pass = 'npg_wX2ZKyd9tRbe';  // senha conforme informada
+$port = 5432;
+$sslmode = 'require';
+
+$dsn = "pgsql:host=$host;port=$port;dbname=$db;sslmode=$sslmode";
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+];
 
 try {
-    $pdo = new PDO($dsn);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    echo "Conexão com o banco de dados realizada com sucesso!";
-
-    // Testar uma consulta simples
-    $stmt = $pdo->query("SELECT NOW()");
-    $row = $stmt->fetch();
-    echo "<br>Data e hora atual do banco: " . $row[0];
-
+    $pdo = new PDO($dsn, $user, $pass, $options);
+    echo "Conexão com banco OK!";
 } catch (PDOException $e) {
+    http_response_code(500);
     echo "Erro na conexão com o banco: " . $e->getMessage();
+    exit;
 }
 ?>
