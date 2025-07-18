@@ -1,19 +1,22 @@
 FROM php:8.1-apache
 
-# Atualiza o apt e instala libpq-dev para suporte ao PostgreSQL + limpa cache para manter a imagem leve
-RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/*
+# Instalar extensões PHP necessárias e dependências do sistema
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql
 
-# Instala as extensões pdo e pdo_pgsql necessárias para conexão com PostgreSQL
-RUN docker-php-ext-install pdo pdo_pgsql
-
-# Habilita o mod_rewrite do Apache
+# Habilitar mod_rewrite do Apache
 RUN a2enmod rewrite
 
-# Copia todo o conteúdo da aplicação para o diretório padrão do Apache
-COPY . /var/www/html/
+# Configurar Apache para reconhecer index.php e index.html
+RUN echo "DirectoryIndex index.php index.html" >> /etc/apache2/apache2.conf
 
-# Exponha a porta padrão do Apache
+# Copiar o código do sistema para o diretório padrão do Apache
+COPY enedes-php-system /var/www/html/
+
+# Ajustar permissões
+RUN chown -R www-data:www-data /var/www/html/
+
 EXPOSE 80
 
-# Comando padrão para rodar o Apache em primeiro plano
 CMD ["apache2-foreground"]
