@@ -2,6 +2,8 @@
 require_once 'config.php';
 require_once 'auth.php';
 require_once 'cronograma.php';
+require_once 'goals.php';
+require_once 'actions.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $endpoint = $_GET['endpoint'] ?? '';
@@ -17,8 +19,19 @@ switch ($endpoint) {
             echo json_encode(["error" => "Método não permitido"]);
         }
         break;
-    default:
-        http_response_code(404);
-        echo json_encode(["error" => "Endpoint não encontrado"]);
-}
-?>
+    case 'goals':
+        if ($method === 'GET') {
+            listarGoals($pdo);
+        } elseif ($method === 'POST') {
+            inserirGoal($pdo);
+        } elseif ($method === 'PUT') {
+            atualizarGoal($pdo);
+        } elseif ($method === 'DELETE') {
+            deletarGoal($pdo);
+        } else {
+            http_response_code(405);
+            echo json_encode(["error" => "Método não permitido"]);
+        }
+        break;
+    case 'actions':
+        if
