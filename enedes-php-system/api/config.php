@@ -1,16 +1,19 @@
 <?php
-$dsn = "pgsql:postgresql://neondb_owner:npg_wX27Kvd9tRbe@ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+$db_config = [
+    'host'   => 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech',
+    'dbname' => 'neondb',
+    'user'   => 'neondb_owner',
+    'pass'   => 'npg_wX2ZKyd9tRbe'
+];
 
 try {
-    $pdo = new PDO($dsn);
-    // Configurações opcionais para o PDO
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-
-    echo "Conexão bem sucedida!";
+    $pdo = new PDO(
+        "pgsql:host={$db_config['host']};dbname={$db_config['dbname']};sslmode=require",
+        $db_config['user'],
+        $db_config['pass'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
 } catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["error" => "Erro na conexão com o banco de dados: " . $e->getMessage()]);
-    exit;
+    die("Erro na conexão com o banco: " . $e->getMessage());
 }
 ?>
