@@ -1,11 +1,11 @@
 <?php
-$host = 'ep-silent-rice-81223089.us-east-2.aws.neon.tech';
-$db   = 'enedesdb';
-$user = 'enedes_admin';
-$pass = 'sua_senha_aqui'; // Substitua pela senha real
-$charset = 'utf8mb4';
+$host = 'ep-patient-dawn-aeikx4fl-pooler.c-2.us-east-2.aws.neon.tech';
+$port = '5432'; // padrão PostgreSQL
+$db   = 'neondb';
+$user = 'neondb_owner';
+$pass = 'npg_yjg2lwFJbZ1E'; // sua senha real aqui
 
-$dsn = "pgsql:host=$host;dbname=$db";
+$dsn = "pgsql:host=$host;port=$port;dbname=$db;sslmode=require";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
