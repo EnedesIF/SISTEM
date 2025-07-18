@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: sistema-enedes
+    env: docker
+    plan: free
+    autoDeploy: true
+    
+    # FORÇA usar Docker sem buildCommand
+    buildCommand: ""
+    startCommand: ""
+    
+    # Dockerfile específico
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    
+    # Build filters para ignorar PHP
+    buildFilter:
+      ignoredPaths:
+        - api/
+        - "*.php"
+        - "*.PHP"
+    
+    # Configurações específicas de runtime
+    disk:
+      name: sistema-enedes-disk
+      mountPath: /data
+    
+    # Headers de segurança
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

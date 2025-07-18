@@ -1,0 +1,45 @@
+total 224
+drwxrwxr-x  2 ubuntu ubuntu   4096 Jul 17 23:28 .
+drwxr-x--- 15 ubuntu ubuntu   4096 Jul 17 23:24 ..
+-rw-r--r--  1 ubuntu ubuntu    381 Jul 17 23:27 .env.example
+-rw-r--r--  1 ubuntu ubuntu    505 Jul 17 23:27 .gitignore
+-rw-r--r--  1 ubuntu ubuntu    435 Jul 17 23:25 Dockerfile
+-rw-rw-r--  1 ubuntu ubuntu      0 Jul 17 23:28 ESTRUTURA_PROJETO.txt
+-rw-r--r--  1 ubuntu ubuntu   7109 Jul 17 23:28 README.md
+-rw-r--r--  1 ubuntu ubuntu  26035 Jul 17 23:27 api.php
+-rw-r--r--  1 ubuntu ubuntu 166164 Jul 17 23:24 index.html
+-rw-r--r--  1 ubuntu ubuntu    330 Jul 17 23:27 render.yaml
+
+=== CONTEÚDO DOS ARQUIVOS PRINCIPAIS ===
+
+--- Dockerfile ---
+FROM php:8.1-apache
+
+# Instalar extensões PHP necessárias
+RUN docker-php-ext-install pdo pdo_pgsql
+
+# Habilitar mod_rewrite do Apache
+RUN a2enmod rewrite
+
+# Copiar todos os arquivos para o diretório web do Apache
+COPY . /var/www/html/
+
+--- render.yaml ---
+services:
+  - type: web
+    name: enedessystem
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: enedes-db
+          property: connectionString
+
+databases:
+  - name: enedes-db
+    databaseName: enedes
+    user: enedes_user
+    plan: free
+
