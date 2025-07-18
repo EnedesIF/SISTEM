@@ -1,9 +1,9 @@
 <?php
-require_once 'config.php';
-require_once 'auth.php';
-require_once 'cronograma.php';
-require_once 'goals.php';
-require_once 'actions.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/cronograma.php';
+require_once __DIR__ . '/goals.php';
+require_once __DIR__ . '/actions.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $endpoint = $_GET['endpoint'] ?? '';
