@@ -34,4 +34,21 @@ switch ($endpoint) {
         }
         break;
     case 'actions':
-        if
+        if ($method === 'GET') {
+            listarActions($pdo);
+        } elseif ($method === 'POST') {
+            inserirAction($pdo);
+        } elseif ($method === 'PUT') {
+            atualizarAction($pdo);
+        } elseif ($method === 'DELETE') {
+            deletarAction($pdo);
+        } else {
+            http_response_code(405);
+            echo json_encode(["error" => "Método não permitido"]);
+        }
+        break;
+    default:
+        http_response_code(404);
+        echo json_encode(["error" => "Endpoint não encontrado"]);
+}
+?>
