@@ -68,11 +68,11 @@ switch ($endpoint) {
                 echo json_encode(['error' => 'Campo title é obrigatório']);
                 break;
             }
-            $stmt = $pdo->prepare("INSERT INTO goals (title, objetivo, program, indicadores, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+            $stmt = $pdo->prepare("INSERT INTO goals (title, objetivo, programa, indicadores, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
                 $input['title'],
                 $input['objetivo'] ?? '',
-                $input['program'] ?? '',
+                $input['programa'] ?? '',
                 isset($input['indicadores']) ? json_encode($input['indicadores']) : '[]',
                 $input['status'] ?? 'ativo'
             ]);
@@ -91,15 +91,17 @@ switch ($endpoint) {
             echo json_encode($stmt->fetchAll());
         } elseif ($method === 'POST') {
             $input = getInput();
-            if (!$input || !isset($input['goal_id']) || !isset($input['description'])) {
+            if (!$input || !isset($input['programa']) || !isset($input['titulo'])) {
                 http_response_code(400);
-                echo json_encode(['error' => 'Campos goal_id e description são obrigatórios']);
+                echo json_encode(['error' => 'Campos programa e titulo são obrigatórios']);
                 break;
             }
-            $stmt = $pdo->prepare("INSERT INTO actions (goal_id, description, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())");
+            $stmt = $pdo->prepare("INSERT INTO actions (programa, titulo, descricao, responsavel, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
-                $input['goal_id'],
-                $input['description'],
+                $input['programa'],
+                $input['titulo'],
+                $input['descricao'] ?? '',
+                $input['responsavel'] ?? '',
                 $input['status'] ?? 'pendente'
             ]);
             echo json_encode(['success' => true, 'message' => 'Ação criada com sucesso!']);
@@ -117,42 +119,18 @@ switch ($endpoint) {
             echo json_encode($stmt->fetchAll());
         } elseif ($method === 'POST') {
             $input = getInput();
-            if (!$input || !isset($input['description'])) {
+            if (!$input || !isset($input['action_id']) || !isset($input['comentario'])) {
                 http_response_code(400);
-                echo json_encode(['error' => 'Campo description é obrigatório']);
+                echo json_encode(['error' => 'Campos action_id e comentario são obrigatórios']);
                 break;
             }
-            $stmt = $pdo->prepare("INSERT INTO followups (description, status, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
+            $stmt = $pdo->prepare("INSERT INTO followups (action_id, comentario, status, created_at) VALUES (?, ?, ?, NOW())");
             $stmt->execute([
-                $input['description'],
+                $input['action_id'],
+                $input['comentario'],
                 $input['status'] ?? 'pendente'
             ]);
             echo json_encode(['success' => true, 'message' => 'Follow-up criado com sucesso!']);
-        } else {
-            http_response_code(405);
-            echo json_encode(['error' => 'Método não permitido']);
-        }
-        break;
-
-    // TASKS (tarefas)
-    case 'tasks':
-        $pdo = conectarBanco();
-        if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM tasks ORDER BY created_at DESC");
-            echo json_encode($stmt->fetchAll());
-        } elseif ($method === 'POST') {
-            $input = getInput();
-            if (!$input || !isset($input['description'])) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Campo description é obrigatório']);
-                break;
-            }
-            $stmt = $pdo->prepare("INSERT INTO tasks (description, status, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
-            $stmt->execute([
-                $input['description'],
-                $input['status'] ?? 'pendente'
-            ]);
-            echo json_encode(['success' => true, 'message' => 'Tarefa criada com sucesso!']);
         } else {
             http_response_code(405);
             echo json_encode(['error' => 'Método não permitido']);
@@ -163,20 +141,21 @@ switch ($endpoint) {
     case 'inventory':
         $pdo = conectarBanco();
         if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM inventory ORDER BY created_at DESC");
+            $stmt = $pdo->query("SELECT * FROM inventory ORDER BY id DESC");
             echo json_encode($stmt->fetchAll());
         } elseif ($method === 'POST') {
             $input = getInput();
-            if (!$input || !isset($input['item'])) {
+            if (!$input || !isset($input['programa']) || !isset($input['item'])) {
                 http_response_code(400);
-                echo json_encode(['error' => 'Campo item é obrigatório']);
+                echo json_encode(['error' => 'Campos programa e item são obrigatórios']);
                 break;
             }
-            $stmt = $pdo->prepare("INSERT INTO inventory (item, quantity, status, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())");
+            $stmt = $pdo->prepare("INSERT INTO inventory (programa, item, descricao, quantidade) VALUES (?, ?, ?, ?)");
             $stmt->execute([
+                $input['programa'],
                 $input['item'],
-                $input['quantity'] ?? 1,
-                $input['status'] ?? 'ativo'
+                $input['descricao'] ?? '',
+                $input['quantidade'] ?? 0
             ]);
             echo json_encode(['success' => true, 'message' => 'Item de inventário criado com sucesso!']);
         } else {
@@ -185,21 +164,22 @@ switch ($endpoint) {
         }
         break;
 
-    // SCHEDULE (cronograma)
-    case 'schedule':
+    // CRONOGRAMA
+    case 'cronograma':
         $pdo = conectarBanco();
         if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM schedule ORDER BY created_at DESC");
+            $stmt = $pdo->query("SELECT * FROM cronograma ORDER BY id DESC");
             echo json_encode($stmt->fetchAll());
         } elseif ($method === 'POST') {
             $input = getInput();
-            if (!$input || !isset($input['etapa'])) {
+            if (!$input || !isset($input['meta_id']) || !isset($input['etapa'])) {
                 http_response_code(400);
-                echo json_encode(['error' => 'Campo etapa é obrigatório']);
+                echo json_encode(['error' => 'Campos meta_id e etapa são obrigatórios']);
                 break;
             }
-            $stmt = $pdo->prepare("INSERT INTO schedule (etapa, inicio, prazo_final, rubrica, valor_executado, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+            $stmt = $pdo->prepare("INSERT INTO cronograma (meta_id, etapa, inicio, prazo_final, rubrica, valor_executado) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([
+                $input['meta_id'],
                 $input['etapa'],
                 $input['inicio'] ?? null,
                 $input['prazo_final'] ?? null,
