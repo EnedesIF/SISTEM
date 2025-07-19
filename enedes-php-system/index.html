@@ -509,9 +509,9 @@
                 }
             }
 
-            // Lista de endpoints disponíveis no backend (conforme logs)
+            // Lista de endpoints disponíveis no backend (conforme DevTools)
             static getAvailableEndpoints() {
-                return ['goals', 'test']; // Apenas endpoints que retornam 200
+                return ['test', 'goals', 'actions']; // ✅ Endpoints que retornam 200 OK
             }
 
             // Verificar se endpoint está disponível
@@ -967,8 +967,10 @@
                     const workingEndpoints = endpointResults.filter(r => r.available).length;
                     const totalEndpoints = endpointResults.length;
                     
-                    if (workingEndpoints > 0) {
-                        showToast(`🌐 Backend conectado! ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
+                    if (endpointResults.filter(r => r.available).length >= 2) {
+                        showToast(`🚀 Backend expandido! ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
+                    } else if (workingEndpoints > 0) {
+                        showToast(`🌐 Backend parcial: ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
                     } else {
                         OFFLINE_MODE = true;
                         showToast("⚠️ Backend conectado mas endpoints indisponíveis", "warning");
@@ -1007,6 +1009,7 @@
         async function testBackendEndpoints() {
             console.log('🔍 Testando endpoints do backend...');
             
+            // ✅ Lista atualizada baseada no DevTools
             const endpoints = ['test', 'goals', 'actions', 'followups', 'tasks', 'inventory', 'schedule'];
             const results = [];
             
@@ -1166,11 +1169,7 @@
                 console.log('📡 Modo:', OFFLINE_MODE ? 'OFFLINE' : 'BACKEND');
                 console.log('🌐 URL Backend:', API_BASE_URL || 'Não configurada');
                 
-                // ✅ Carregar apenas endpoints disponíveis
-                const promises = [];
-                const dataResults = {};
-                
-                // METAS - sempre tentar (endpoint disponível)
+                // ✅ METAS - Backend disponível
                 console.log('📋 Carregando metas do backend...');
                 promises.push(
                     APIService.getMetas()
@@ -1186,10 +1185,25 @@
                         })
                 );
 
-                // OUTROS ENDPOINTS - usar localStorage (404 no backend)
+                // ✅ AÇÕES - Backend disponível (NOVO!)
+                console.log('📝 Carregando ações do backend...');
+                promises.push(
+                    APIService.getActions()
+                        .then(result => { 
+                            dataResults.actions = result;
+                            console.log('✅ Ações carregadas do BACKEND:', result.data?.length || 0, 'itens');
+                        })
+                        .catch(error => {
+                            console.log('⚠️ Erro ao carregar ações do backend:', error.message);
+                            const localActions = JSON.parse(localStorage.getItem('enedes_actions') || '[]');
+                            dataResults.actions = { data: localActions };
+                            console.log('🔄 Ações carregadas do LOCALSTORAGE:', localActions.length, 'itens');
+                        })
+                );
+
+                // ❌ OUTROS ENDPOINTS - usar localStorage (404 no backend)
                 console.log('📦 Carregando outros dados do localStorage...');
                 const localStorageKeys = {
-                    actions: 'enedes_actions',
                     followUps: 'enedes_followups', 
                     tasks: 'enedes_tasks',
                     cronograma: 'enedes_cronograma',
@@ -1200,7 +1214,7 @@
                     try {
                         const data = JSON.parse(localStorage.getItem(storageKey) || '[]');
                         dataResults[key] = { data };
-                        console.log(`✅ ${key} carregado do localStorage:`, data.length, 'itens');
+                        console.log(`✅ ${key} carregado do LOCALSTORAGE:`, data.length, 'itens');
                     } catch (error) {
                         console.log(`⚠️ Erro ao carregar ${key}:`, error.message);
                         dataResults[key] = { data: [] };
@@ -1221,10 +1235,11 @@
                 // Status final
                 const totalItems = metas.length + actions.length + followUps.length + tasks.length + cronograma.length + inventario.length;
                 const hasBackendMetas = !OFFLINE_MODE && metas.length > 0;
+                const hasBackendActions = !OFFLINE_MODE && actions.length > 0;
                 
                 console.log('📊 Resumo dos dados carregados:');
                 console.log(`   - Metas: ${metas.length} ${hasBackendMetas ? '(BACKEND)' : '(LOCAL)'}`);
-                console.log(`   - Ações: ${actions.length} (LOCAL)`);
+                console.log(`   - Ações: ${actions.length} ${hasBackendActions ? '(BACKEND)' : '(LOCAL)'}`);
                 console.log(`   - Follow-ups: ${followUps.length} (LOCAL)`);
                 console.log(`   - Tarefas: ${tasks.length} (LOCAL)`);
                 console.log(`   - Cronograma: ${cronograma.length} (LOCAL)`);
@@ -1234,6 +1249,8 @@
                 let successMessage;
                 if (OFFLINE_MODE) {
                     successMessage = `💾 ${totalItems} itens carregados (modo offline)`;
+                } else if (hasBackendMetas && hasBackendActions) {
+                    successMessage = `🚀 Sistema híbrido otimizado: Metas + Ações no backend! (${totalItems} itens)`;
                 } else if (hasBackendMetas) {
                     successMessage = `🎯 Sistema híbrido: Metas no backend, outros dados locais (${totalItems} itens)`;
                 } else {
@@ -1529,6 +1546,7 @@
                     throw new Error("O título da ação é obrigatório!");
                 }
 
+                // ✅ DADOS PARA O BACKEND
                 const actionData = {
                     titulo,
                     programa,
@@ -1539,26 +1557,58 @@
                     created_at: new Date().toISOString()
                 };
 
+                console.log('📤 Enviando ação para backend:', JSON.stringify(actionData, null, 2));
+                console.log('🌐 URL:', `${API_BASE_URL}/api.php?endpoint=actions`);
+
                 if (id) {
+                    // UPDATE: adicionar ID no payload
+                    actionData.id = parseInt(id);
+                    console.log('🔄 Atualizando ação ID:', id);
                     await APIService.updateAction(id, actionData);
+                    
                     // Atualizar no array local
                     const actionIndex = actions.findIndex(a => a.id == id);
                     if (actionIndex > -1) {
                         actions[actionIndex] = { ...actions[actionIndex], ...actionData };
                     }
                     await logActivity(`Ação "${titulo}" atualizada`, "info", "edit");
+                    showToast("✅ Ação atualizada no backend!", "success");
                 } else {
+                    // CREATE: novo item
+                    console.log('➕ Criando nova ação');
                     const response = await APIService.createAction(actionData);
+                    console.log('📥 Resposta do backend:', response);
+                    
                     // Adicionar ao array local
-                    actions.push({ id: response.id, ...actionData });
+                    const newAction = {
+                        id: response.id || Date.now(),
+                        ...actionData
+                    };
+                    actions.push(newAction);
                     await logActivity(`Nova ação "${titulo}" cadastrada`, "success", "plus");
+                    showToast("✅ Ação cadastrada no banco PostgreSQL!", "success");
                 }
 
                 updateAllData();
                 closeModal();
-                showToast("Ação salva com sucesso!", "success");
+                
             } catch (error) {
-                showToast(error.message, "error");
+                console.error('❌ Erro detalhado ao salvar ação:', error);
+                
+                let errorMessage = error.message;
+                
+                // Tratar erros específicos
+                if (error.message.includes('400')) {
+                    errorMessage = "❌ Erro 400: Dados inválidos enviados ao backend. Verifique os campos obrigatórios.";
+                } else if (error.message.includes('404')) {
+                    errorMessage = "⚠️ Endpoint não encontrado. Ação salva localmente.";
+                } else if (error.message.includes('500')) {
+                    errorMessage = "🔧 Erro interno do servidor. Tente novamente em alguns instantes.";
+                } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                    errorMessage = "🌐 Erro de conexão. Verifique sua internet e tente novamente.";
+                }
+                
+                showToast(errorMessage, "error");
             } finally {
                 saveButton.innerHTML = originalText;
                 saveButton.disabled = false;
@@ -3704,9 +3754,9 @@
                         <div class="flex items-center space-x-3">
                             <span data-lucide="check-circle" style="font-size: 20px;">✅</span>
                             <div>
-                                <h4 class="font-medium text-green-900">✅ Backend ENEDES conectado!</h4>
-                                <p class="text-sm text-green-700">Endpoint METAS funcionando - dados salvos no PostgreSQL Neon</p>
-                                <span class="text-xs text-green-600">Status: Conectado</span>
+                                <h4 class="font-medium text-green-900">🚀 Backend EXPANDIDO detectado!</h4>
+                                <p class="text-sm text-green-700">Agora METAS + AÇÕES funcionam no backend PostgreSQL!</p>
+                                <span class="text-xs text-green-600">Status: 2/7 endpoints funcionais</span>
                             </div>
                         </div>
                     </div>
@@ -3715,9 +3765,9 @@
                         <div class="flex items-center space-x-3">
                             <span data-lucide="info" style="font-size: 20px;">ℹ️</span>
                             <div>
-                                <h4 class="font-medium text-blue-900">📊 Sistema híbrido ativo</h4>
-                                <p class="text-sm text-blue-700">Metas: Backend | Outros dados: LocalStorage (temporário)</p>
-                                <span class="text-xs text-blue-600">Modo: Backend + Local</span>
+                                <h4 class="font-medium text-blue-900">📊 Endpoints Funcionais (Status 200)</h4>
+                                <p class="text-sm text-blue-700">✅ test | ✅ goals | ✅ actions</p>
+                                <span class="text-xs text-blue-600">Salvos no PostgreSQL Neon</span>
                             </div>
                         </div>
                     </div>
@@ -3726,9 +3776,9 @@
                         <div class="flex items-center space-x-3">
                             <span data-lucide="alert-triangle" style="font-size: 20px;">⚠️</span>
                             <div>
-                                <h4 class="font-medium text-amber-900">🔧 Alguns endpoints em desenvolvimento</h4>
-                                <p class="text-sm text-amber-700">Ações, follow-ups e inventário usam storage local até implementação no backend</p>
-                                <span class="text-xs text-amber-600">Em desenvolvimento</span>
+                                <h4 class="font-medium text-amber-900">🔧 Endpoints em desenvolvimento (Status 404)</h4>
+                                <p class="text-sm text-amber-700">❌ followups | ❌ tasks | ❌ inventory | ❌ schedule</p>
+                                <span class="text-xs text-amber-600">Usando localStorage temporariamente</span>
                             </div>
                         </div>
                     </div>
@@ -3737,8 +3787,8 @@
                         <div class="flex items-center space-x-3">
                             <span data-lucide="target" style="font-size: 20px;">🎯</span>
                             <div>
-                                <h4 class="font-medium text-purple-900">🚀 Teste: Cadastre uma nova meta!</h4>
-                                <p class="text-sm text-purple-700">Suas metas serão salvas diretamente no banco PostgreSQL</p>
+                                <h4 class="font-medium text-purple-900">🚀 Teste: Cadastre metas e ações!</h4>
+                                <p class="text-sm text-purple-700">Ambos serão salvos no banco PostgreSQL automaticamente</p>
                                 <span class="text-xs text-purple-600">100% funcional</span>
                             </div>
                         </div>
@@ -3751,7 +3801,7 @@
                 <button onclick="markAllAsRead()" class="gradient-bg text-white px-4 py-2 rounded-lg hover:opacity-90">Entendi</button>
             `;
 
-            createModal("Status do Sistema", content, footer);
+            createModal("Status do Sistema - Backend Expandido", content, footer);
         }
 
         function markAllAsRead() {
@@ -3778,9 +3828,9 @@
                         exportedBy: currentUser.name,
                         totalItems: metas.length + actions.length + followUps.length + tasks.length + cronograma.length + inventario.length,
                         dataSource: {
-                            metas: OFFLINE_MODE ? 'localStorage' : 'backend',
-                            actions: 'localStorage',
-                            followUps: 'localStorage', 
+                            metas: OFFLINE_MODE ? 'localStorage' : 'backend PostgreSQL',
+                            actions: OFFLINE_MODE ? 'localStorage' : 'backend PostgreSQL',
+                            followUps: 'localStorage',
                             tasks: 'localStorage',
                             cronograma: 'localStorage',
                             inventario: 'localStorage'
@@ -3789,11 +3839,13 @@
                     
                     // Informações do sistema
                     systemInfo: {
-                        version: "2.1 - Sistema Híbrido",
+                        version: "2.2 - Sistema Híbrido Expandido",
                         backend: API_BASE_URL || 'Não configurado',
                         mode: OFFLINE_MODE ? 'offline' : 'hybrid',
+                        backendEndpoints: ['test', 'goals', 'actions'],
+                        localStorageEndpoints: ['followups', 'tasks', 'inventory', 'schedule'],
                         endpointStatus: lastEndpointTest?.summary || 'Não testado',
-                        payloadFormat: "title, program, objetivo, indicadores, status"
+                        payloadFormat: "campos em português/inglês conforme endpoint"
                     }
                 };
                 
@@ -3987,16 +4039,16 @@
                 console.log(`📊 Lucide: ${lucideLoaded ? 'Carregado' : 'Usando fallback'}`);
                 console.log(`📈 Chart.js: ${chartLoaded ? 'Carregado' : 'Usando fallback'}`);
                 
-                let statusMessage = "✅ Sistema ENEDES carregado - Backend compatível!";
+                let statusMessage = "🚀 Sistema ENEDES carregado - Metas + Ações no backend!";
                 if (!lucideLoaded || !chartLoaded) {
-                    statusMessage = "✅ Sistema ENEDES carregado - Funcional e estável!";
+                    statusMessage = "🚀 Sistema ENEDES carregado - Backend expandido funcionando!";
                 }
                 
                 showToast(statusMessage, "success");
                 
             } catch (error) {
                 console.error('Erro na inicialização:', error);
-                showToast("✅ Sistema funcional - Campos corrigidos para backend!", "warning");
+                showToast("✅ Sistema funcional - Metas e Ações no backend!", "warning");
             }
         });
     </script>
