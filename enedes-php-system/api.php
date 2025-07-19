@@ -20,12 +20,12 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Configuração direta para Neon.tech (SUBSTITUA SUA SENHA)
-        $this->host = 'ep-gentle-unit-a5p9h5ux.us-east-2.aws.neon.tech';
+        // Configuração correta para seu Neon.tech
+        $this->host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
         $this->port = 5432;
         $this->db_name = 'neondb';
         $this->username = 'neondb_owner';
-        $this->password = 'SUBSTITUA_PELA_SUA_SENHA_NEON'; // ⚠️ COLOQUE SUA SENHA AQUI
+        $this->password = 'npg_wX2ZKyd9tRbe'; // ✅ SENHA CORRETA
     }
 
     public function getConnection() {
@@ -278,7 +278,8 @@ switch ($endpoint) {
             'method' => $method,
             'php_version' => phpversion(),
             'database_connected' => $db ? true : false,
-            'endpoint_requested' => $endpoint
+            'endpoint_requested' => $endpoint,
+            'neon_host' => 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech'
         ]);
         break;
 
