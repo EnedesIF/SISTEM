@@ -2516,12 +2516,19 @@
                 return targetItem && (targetItem.programa === program.name);
             });
 
+            // Estatísticas do programa
+            const actionsCompleted = programActions.filter(a => a.status === 'completed').length;
+            const actionsInProgress = programActions.filter(a => a.status === 'in_progress').length;
+            const actionsPending = programActions.filter(a => a.status === 'pending').length;
+            const completionRate = programActions.length > 0 ? Math.round((actionsCompleted / programActions.length) * 100) : 0;
+
             const content = `
                 <div class="space-y-6">
+                    <!-- Header do Programa -->
                     <div class="bg-${program.color}-50 rounded-lg p-6">
                         <div class="flex items-center space-x-4">
                             <div class="bg-${program.color}-100 p-3 rounded-lg">
-                                <i data-lucide="${program.icon}" class="w-8 h-8 text-${program.color}-600"></i>
+                                <span data-lucide="${program.icon}" style="font-size: 32px;">${getIconFallback(program.icon)}</span>
                             </div>
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900">${program.name}</h3>
@@ -2535,18 +2542,99 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Dashboard do Programa -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total de Ações</p>
+                                    <p class="text-2xl font-bold text-gray-900">${programActions.length}</p>
+                                </div>
+                                <div class="bg-blue-100 p-2 rounded-lg">
+                                    <span style="font-size: 20px;">📋</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Concluídas</p>
+                                    <p class="text-2xl font-bold text-green-600">${actionsCompleted}</p>
+                                </div>
+                                <div class="bg-green-100 p-2 rounded-lg">
+                                    <span style="font-size: 20px;">✅</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Em Andamento</p>
+                                    <p class="text-2xl font-bold text-blue-600">${actionsInProgress}</p>
+                                </div>
+                                <div class="bg-blue-100 p-2 rounded-lg">
+                                    <span style="font-size: 20px;">🔄</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Taxa de Conclusão</p>
+                                    <p class="text-2xl font-bold text-purple-600">${completionRate}%</p>
+                                </div>
+                                <div class="bg-purple-100 p-2 rounded-lg">
+                                    <span style="font-size: 20px;">📊</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Progresso Visual -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                        <h4 class="font-medium text-gray-900 mb-3">Progresso das Ações</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span>Concluídas (${actionsCompleted})</span>
+                                <span>${programActions.length > 0 ? Math.round((actionsCompleted/programActions.length)*100) : 0}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: ${programActions.length > 0 ? (actionsCompleted/programActions.length)*100 : 0}%"></div>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span>Em Andamento (${actionsInProgress})</span>
+                                <span>${programActions.length > 0 ? Math.round((actionsInProgress/programActions.length)*100) : 0}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: ${programActions.length > 0 ? (actionsInProgress/programActions.length)*100 : 0}%"></div>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <span>Pendentes (${actionsPending})</span>
+                                <span>${programActions.length > 0 ? Math.round((actionsPending/programActions.length)*100) : 0}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: ${programActions.length > 0 ? (actionsPending/programActions.length)*100 : 0}%"></div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- Tabs for Actions, Follow-ups and Inventory -->
                     <div class="border-b border-gray-200">
                         <nav class="-mb-px flex space-x-8">
                             <button onclick="showProgramDetailsSubTab('actions', ${program.id})" class="py-2 px-1 border-b-2 border-blue-500 text-blue-600 font-medium text-sm" id="program-details-tab-actions">
-                                Ações (${programActions.length})
+                                📋 Ações (${programActions.length})
                             </button>
                             <button onclick="showProgramDetailsSubTab('followups', ${program.id})" class="py-2 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-900 font-medium text-sm" id="program-details-tab-followups">
-                                Follow-ups (${programFollowUps.length})
+                                📤 Follow-ups (${programFollowUps.length})
                             </button>
                             <button onclick="showProgramDetailsSubTab('inventory', ${program.id})" class="py-2 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-900 font-medium text-sm" id="program-details-tab-inventory">
-                                Inventário (${programInventory.length})
+                                📦 Inventário (${programInventory.length})
                             </button>
                         </nav>
                     </div>
@@ -2556,8 +2644,7 @@
                         <div class="flex justify-between items-center mb-4">
                             <h4 class="font-semibold text-gray-900">Ações do Programa</h4>
                             <button onclick="showActionForm('${program.name}')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                                Nova Ação
+                                <span data-lucide="plus">+</span> Nova Ação
                             </button>
                         </div>
                         <div class="space-y-3">
@@ -2574,16 +2661,13 @@
                                             <span class="text-gray-500">Responsável: ${action.responsavel}</span>
                                             <div class="space-x-2">
                                                 <button onclick="editAction('${action.id}')" class="text-blue-600 hover:text-blue-800">
-                                                    <i data-lucide="edit-2" class="w-4 h-4 inline mr-1"></i>
-                                                    Editar
+                                                    <span data-lucide="edit-2">✏️</span> Editar
                                                 </button>
                                                 <button onclick="showFollowUpForm('${action.id}', '', 'action')" class="text-green-600 hover:text-green-800">
-                                                    <i data-lucide="send" class="w-4 h-4 inline mr-1"></i>
-                                                    Follow-up
+                                                    <span data-lucide="send">📤</span> Follow-up
                                                 </button>
                                                 <button onclick="deleteAction('${action.id}')" class="text-red-600 hover:text-red-800">
-                                                    <i data-lucide="trash-2" class="w-4 h-4 inline mr-1"></i>
-                                                    Excluir
+                                                    <span data-lucide="trash-2">🗑️</span> Excluir
                                                 </button>
                                             </div>
                                         </div>
@@ -2624,8 +2708,7 @@
                                                     </div>
                                                 </div>
                                                 <button onclick="showFollowUpTasks('${followUp.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
-                                                    <i data-lucide="list" class="w-4 h-4 inline mr-1"></i>
-                                                    Tarefas
+                                                    <span data-lucide="list">📝</span> Tarefas
                                                 </button>
                                             </div>
                                         </div>
@@ -2640,8 +2723,7 @@
                         <div class="flex justify-between items-center mb-4">
                             <h4 class="font-semibold text-gray-900">Inventário de Equipamentos</h4>
                             <button onclick="showInventarioForm('${program.name}')" class="text-purple-600 hover:text-purple-800 text-sm font-medium">
-                                <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                                Novo Equipamento
+                                <span data-lucide="plus">+</span> Novo Equipamento
                             </button>
                         </div>
                         <div class="overflow-x-auto">
@@ -2666,10 +2748,10 @@
                                                 <td class="px-4 py-4 text-sm text-gray-900">${item.atividades_relacionadas || "N/A"}</td>
                                                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <button onclick="editInventarioItem('${item.id}')" class="text-blue-600 hover:text-blue-900 mr-2">
-                                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                                        <span data-lucide="edit-2">✏️</span>
                                                     </button>
                                                     <button onclick="deleteInventarioItem('${item.id}')" class="text-red-600 hover:text-red-900">
-                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                        <span data-lucide="trash-2">🗑️</span>
                                                     </button>
                                                 </td>
                                             </tr>
@@ -2691,6 +2773,21 @@
             `;
 
             createModal(program.name, content, footer);
+        }
+
+        // Função auxiliar para ícones fallback
+        function getIconFallback(iconName) {
+            const iconMap = {
+                'rocket': '🚀',
+                'map': '🗺️', 
+                'shopping-cart': '🛒',
+                'users': '👥',
+                'video': '🎥',
+                'smartphone': '📱',
+                'monitor': '🖥️',
+                'megaphone': '📢'
+            };
+            return iconMap[iconName] || '📄';
         }
 
         function showProgramDetailsSubTab(tabName, programId) {
