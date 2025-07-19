@@ -997,6 +997,28 @@
                                                 </div>
                                             </div>
                                             <p class="text-sm text-gray-600 mb-2">${task.descricao}</p>
+                                            
+                                            <!-- Exibir arquivos anexados -->
+                                            ${task.attachments && task.attachments.length > 0 ? `
+                                                <div class="mb-2 p-2 bg-gray-50 rounded border">
+                                                    <div class="flex items-center text-xs text-gray-600 mb-1">
+                                                        <i data-lucide="paperclip" class="w-3 h-3 mr-1"></i>
+                                                        ${task.attachments.length} arquivo(s) anexado(s)
+                                                    </div>
+                                                    <div class="space-y-1">
+                                                        ${task.attachments.map(file => `
+                                                            <div class="flex items-center justify-between text-xs">
+                                                                <span class="text-blue-600 hover:text-blue-800 cursor-pointer" onclick="downloadFile('${file.url}', '${file.name}')">
+                                                                    <i data-lucide="file" class="w-3 h-3 inline mr-1"></i>
+                                                                    ${file.name}
+                                                                </span>
+                                                                <span class="text-gray-400">${formatFileSize(file.size)}</span>
+                                                            </div>
+                                                        `).join('')}
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
                                             <div class="flex justify-between items-center text-xs text-gray-500">
                                                 <span>Responsável: ${task.responsavel}</span>
                                                 <span>Prazo: ${task.prazo || "Não definido"}</span>
@@ -1056,6 +1078,23 @@
                             <input type="date" id="taskDeadline" class="w-full p-2 border border-gray-300 rounded-lg">
                         </div>
                     </div>
+                    
+                    <!-- Nova seção para anexar arquivos -->
+                    <div class="border-t pt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i data-lucide="paperclip" class="w-4 h-4 inline mr-1"></i>
+                            Anexar Arquivos
+                        </label>
+                        <div class="space-y-2">
+                            <input type="file" id="taskFiles" class="w-full p-2 border border-gray-300 rounded-lg" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif">
+                            <div class="text-xs text-gray-500">
+                                Formatos aceitos: PDF, DOC, XLS, PPT, TXT, JPG, PNG, GIF (máx. 10MB por arquivo)
+                            </div>
+                            <div id="taskFilesList" class="space-y-1">
+                                <!-- Lista de arquivos selecionados aparecerá aqui -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
 
@@ -1065,6 +1104,20 @@
             `;
 
             createModal("Nova Tarefa", content, footer);
+            
+            // Adicionar event listener para mostrar arquivos selecionados
+            setTimeout(() => {
+                const fileInput = document.getElementById('taskFiles');
+                if (fileInput) {
+                    fileInput.addEventListener('change', function() {
+                        displaySelectedFiles(this.files, 'taskFilesList');
+                    });
+                }
+                // Recarregar ícones Lucide
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }, 100);
         }
 
         function saveTask() {
@@ -1074,10 +1127,34 @@
             const responsavel = document.getElementById("taskResponsible").value;
             const status = document.getElementById("taskStatus").value;
             const prazo = document.getElementById("taskDeadline").value;
+            const fileInput = document.getElementById("taskFiles");
 
             if (!titulo.trim()) {
                 alert("O título da tarefa é obrigatório!");
                 return;
+            }
+
+            // Processar arquivos anexados
+            const attachments = [];
+            if (fileInput && fileInput.files.length > 0) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    
+                    // Verificar tamanho do arquivo (máx. 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert(`Arquivo "${file.name}" é muito grande. Máximo permitido: 10MB`);
+                        return;
+                    }
+                    
+                    attachments.push({
+                        id: Date.now() + i,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        uploadedAt: new Date().toISOString(),
+                        url: URL.createObjectURL(file)
+                    });
+                }
             }
 
             const task = {
@@ -1088,17 +1165,20 @@
                 responsavel,
                 status,
                 prazo,
+                attachments: attachments,
                 createdAt: new Date().toISOString(),
                 lastUpdate: new Date().toISOString()
             };
 
             tasks.push(task);
-            logActivity(`Nova tarefa "${titulo}" criada`, "success", "plus");
+            
+            const attachmentText = attachments.length > 0 ? ` com ${attachments.length} arquivo(s)` : '';
+            logActivity(`Nova tarefa "${titulo}" criada${attachmentText}`, "success", "plus");
             
             saveData();
             updateAllData();
             closeModal();
-            showToast("Tarefa criada com sucesso!", "success");
+            showToast(`Tarefa criada com sucesso!${attachmentText}`, "success");
             
             // Reopen the follow-up tasks modal
             setTimeout(() => showFollowUpTasks(followUpId), 100);
@@ -1457,10 +1537,14 @@
                     
                     <div id="program-details-dashboard-content" class="p-6">
                         <!-- Dashboard content will be loaded here -->
-                    </div>cide="package" class="w-4 h-4 inline mr-2"></i>
-                                Inventário (${programInventory.length})
-                            </button>
-                        </div>
+                    </div>
+                    
+                    <!-- Inventory Tab Button (fixed) -->
+                    <button onclick="showProgramTab('inventory')" class="tab-button flex items-center px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                        <i data-lucide="package" class="w-4 h-4 inline mr-2"></i>
+                        Inventário (${programInventory.length})
+                    </button>
+                </div>
                         
                         <!-- Actions Tab -->
                         <div id="program-details-actions-content" class="p-6">
@@ -2064,18 +2148,48 @@
         }
 
         function deleteAction(actionId) {
-            if (confirm("Tem certeza que deseja excluir esta ação?")) {
-                const actionIndex = actions.findIndex(a => a.id == actionId);
-                if (actionIndex > -1) {
-                    const actionTitle = actions[actionIndex].titulo;
-                    actions.splice(actionIndex, 1);
-                    logActivity(`Ação "${actionTitle}" excluída`, "warning", "trash-2");
-                    saveData();
-                    updateAllData();
-                    showToast("Ação excluída!", "success");
-                    closeModal();
+            // Usar setTimeout para garantir que o confirm funcione
+            setTimeout(() => {
+                if (confirm("Tem certeza que deseja excluir esta ação?")) {
+                    const actionIndex = actions.findIndex(a => a.id == actionId);
+                    if (actionIndex > -1) {
+                        const actionTitle = actions[actionIndex].titulo;
+                        actions.splice(actionIndex, 1);
+                        
+                        // Salvar dados
+                        saveData();
+                        
+                        // Fechar modal se estiver aberto
+                        const modal = document.getElementById('modal');
+                        if (modal && !modal.classList.contains('hidden')) {
+                            closeModal();
+                        }
+                        
+                        // Atualizar interface
+                        updateAllData();
+                        
+                        // Mostrar confirmação
+                        showToast(`Ação "${actionTitle}" excluída com sucesso!`, "success");
+                        
+                        // Log da atividade
+                        logActivity(`Ação "${actionTitle}" excluída`, "warning", "trash-2");
+                        
+                        console.log('Ação excluída:', actionTitle);
+                        
+                        // Forçar atualização da interface após um pequeno delay
+                        setTimeout(() => {
+                            if (currentSection === 'programas') {
+                                updateProgramsSection();
+                            }
+                            if (currentSection === 'meu-programa') {
+                                updateMeuProgramaSection();
+                            }
+                        }, 100);
+                    } else {
+                        showToast("Erro: Ação não encontrada!", "error");
+                    }
                 }
-            }
+            }, 10);
         }
 
         function showInventarioForm(programName = "", itemId = null) {
@@ -2235,18 +2349,38 @@
         }
 
         function deleteCronogramaEtapa(etapaId) {
-            if (confirm("Tem certeza que deseja excluir esta etapa?")) {
-                const etapaIndex = cronograma.findIndex(e => e.id == etapaId);
-                if (etapaIndex > -1) {
-                    const etapaNome = cronograma[etapaIndex].nome;
-                    cronograma.splice(etapaIndex, 1);
-                    logActivity(`Etapa "${etapaNome}" excluída do cronograma`, "warning", "trash-2");
-                    saveData();
-                    updateAllData();
-                    showToast("Etapa excluída!", "success");
-                    closeModal();
+            // Usar setTimeout para garantir que o confirm funcione
+            setTimeout(() => {
+                if (confirm("Tem certeza que deseja excluir esta etapa?")) {
+                    const etapaIndex = cronograma.findIndex(e => e.id == etapaId);
+                    if (etapaIndex > -1) {
+                        const etapaNome = cronograma[etapaIndex].nome;
+                        cronograma.splice(etapaIndex, 1);
+                        
+                        // Salvar dados
+                        saveData();
+                        
+                        // Atualizar interface
+                        updateAllData();
+                        
+                        // Mostrar confirmação
+                        showToast(`Etapa "${etapaNome}" excluída com sucesso!`, "success");
+                        
+                        // Log da atividade
+                        logActivity(`Etapa "${etapaNome}" excluída do cronograma`, "warning", "trash-2");
+                        
+                        console.log('Etapa excluída:', etapaNome);
+                        
+                        // Fechar modal se estiver aberto
+                        const modal = document.getElementById('modal');
+                        if (modal && !modal.classList.contains('hidden')) {
+                            closeModal();
+                        }
+                    } else {
+                        showToast("Erro: Etapa não encontrada!", "error");
+                    }
                 }
-            }
+            }, 10);
         }
 
         function loadMetas() {
@@ -2317,18 +2451,33 @@
         }
 
         function deleteMeta(metaId) {
-            if (confirm("Tem certeza que deseja excluir esta meta?")) {
-                const metaIndex = metas.findIndex(m => m.id == metaId);
-                if (metaIndex > -1) {
-                    const metaTitle = metas[metaIndex].titulo;
-                    metas.splice(metaIndex, 1);
-                    logActivity(`Meta "${metaTitle}" excluída`, "warning", "trash-2");
-                    saveData();
-                    loadMetas(); // Atualizar a lista de metas
-                    updateAllData();
-                    showToast("Meta excluída!", "success");
+            // Usar setTimeout para garantir que o confirm funcione
+            setTimeout(() => {
+                if (confirm("Tem certeza que deseja excluir esta meta?")) {
+                    const metaIndex = metas.findIndex(m => m.id == metaId);
+                    if (metaIndex > -1) {
+                        const metaTitle = metas[metaIndex].titulo;
+                        metas.splice(metaIndex, 1);
+                        
+                        // Salvar dados
+                        saveData();
+                        
+                        // Atualizar interface
+                        loadMetas();
+                        updateAllData();
+                        
+                        // Mostrar confirmação
+                        showToast(`Meta "${metaTitle}" excluída com sucesso!`, "success");
+                        
+                        // Log da atividade
+                        logActivity(`Meta "${metaTitle}" excluída`, "warning", "trash-2");
+                        
+                        console.log('Meta excluída:', metaTitle);
+                    } else {
+                        showToast("Erro: Meta não encontrada!", "error");
+                    }
                 }
-            }
+            }, 10);
         }
 
         function loadCronograma() {
@@ -2733,7 +2882,10 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
                         <select id="task-responsible" class="w-full p-3 border border-gray-300 rounded-lg">
-                            ${followUp.colaboradores.map(collab => `<option value="${collab}">${collab}</option>`).join("")}
+                            ${followUp && followUp.colaboradores ? followUp.colaboradores.map(collab => {
+                                const name = typeof collab === 'object' ? collab.name : collab;
+                                return `<option value="${name}">${name}</option>`;
+                            }).join("") : '<option value="Não definido">Não definido</option>'}
                         </select>
                     </div>
                     <div>
@@ -2748,6 +2900,23 @@
                             <option value="completed">Concluída</option>
                         </select>
                     </div>
+                    
+                    <!-- Seção de Upload de Arquivos -->
+                    <div class="border-t pt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i data-lucide="paperclip" class="w-4 h-4 inline mr-1"></i>
+                            Anexar Arquivos
+                        </label>
+                        <div class="space-y-2">
+                            <input type="file" id="task-files" class="w-full p-2 border border-gray-300 rounded-lg" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif">
+                            <div class="text-xs text-gray-500">
+                                Formatos aceitos: PDF, DOC, XLS, PPT, TXT, JPG, PNG, GIF (máx. 10MB por arquivo)
+                            </div>
+                            <div id="task-files-list" class="space-y-1">
+                                <!-- Lista de arquivos selecionados aparecerá aqui -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
             
@@ -2757,6 +2926,20 @@
             `;
             
             createModal("Nova Tarefa", content, footer);
+            
+            // Adicionar event listener para arquivos
+            setTimeout(() => {
+                const fileInput = document.getElementById('task-files');
+                if (fileInput) {
+                    fileInput.addEventListener('change', function() {
+                        displaySelectedFiles(this.files, 'task-files-list');
+                    });
+                }
+                // Recarregar ícones Lucide
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }, 100);
         }
 
         function saveTask(followUpId) {
@@ -2765,10 +2948,34 @@
             const responsavel = document.getElementById('task-responsible').value;
             const prazo = document.getElementById('task-deadline').value;
             const status = document.getElementById('task-status').value;
+            const fileInput = document.getElementById('task-files');
             
             if (!titulo.trim() || !descricao.trim() || !prazo) {
                 showToast("Por favor, preencha todos os campos obrigatórios", "error");
                 return;
+            }
+            
+            // Processar arquivos anexados
+            const attachments = [];
+            if (fileInput && fileInput.files.length > 0) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    
+                    // Verificar tamanho do arquivo (máx. 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        showToast(`Arquivo "${file.name}" é muito grande. Máximo permitido: 10MB`, "error");
+                        return;
+                    }
+                    
+                    attachments.push({
+                        id: Date.now() + i,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        uploadedAt: new Date().toISOString(),
+                        url: URL.createObjectURL(file)
+                    });
+                }
             }
             
             const task = {
@@ -2779,14 +2986,18 @@
                 responsavel: responsavel,
                 prazo: prazo,
                 status: status,
+                attachments: attachments,
                 createdAt: new Date().toISOString()
             };
             
             if (!tasks) tasks = [];
             tasks.push(task);
             saveData();
+            closeModal();
             showFollowUpTasks(followUpId);
-            showToast("Tarefa criada com sucesso!", "success");
+            
+            const attachmentText = attachments.length > 0 ? ` com ${attachments.length} arquivo(s)` : '';
+            showToast(`Tarefa criada com sucesso!${attachmentText}`, "success");
         }
 
         function updateTaskStatus(taskId) {
@@ -2944,6 +3155,72 @@
                 document.getElementById("meuProgramaTab").classList.add("hidden");
                 showToast("Logout realizado com sucesso!", "success");
             }
+        }
+
+        // Funções auxiliares para upload de arquivos
+        function displaySelectedFiles(files, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'flex items-center justify-between p-2 bg-blue-50 rounded border text-xs';
+                fileDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i data-lucide="file" class="w-3 h-3 mr-2 text-blue-600"></i>
+                        <span class="text-blue-800">${file.name}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-gray-500">${formatFileSize(file.size)}</span>
+                        <button type="button" onclick="removeSelectedFile(${i}, '${containerId}')" class="text-red-500 hover:text-red-700">
+                            <i data-lucide="x" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(fileDiv);
+            }
+            
+            // Recarregar ícones Lucide
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        function removeSelectedFile(index, containerId) {
+            const fileInput = document.getElementById(containerId.replace('List', ''));
+            if (!fileInput) return;
+            
+            const dt = new DataTransfer();
+            const files = fileInput.files;
+            
+            for (let i = 0; i < files.length; i++) {
+                if (i !== index) {
+                    dt.items.add(files[i]);
+                }
+            }
+            
+            fileInput.files = dt.files;
+            displaySelectedFiles(fileInput.files, containerId);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function downloadFile(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // Initialize the application
