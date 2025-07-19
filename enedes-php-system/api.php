@@ -17,7 +17,7 @@ function sendResponse($data, $status = 200) {
     exit();
 }
 
-// Database configuration
+// Database configuration using environment variables
 class Database {
     private $host;
     private $db_name;
@@ -27,12 +27,25 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Usando o banco vazio com senha conhecida
-        $this->host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
-        $this->port = 5432;
-        $this->db_name = 'neondb';
-        $this->username = 'neondb_owner';
-        $this->password = 'npg_wX2ZKyd9tRbe';
+        // Usar environment variable (mais seguro e profissional)
+        $database_url = getenv('DATABASE_URL');
+        
+        if ($database_url) {
+            // Parse da URL do banco
+            $url = parse_url($database_url);
+            $this->host = $url['host'];
+            $this->port = $url['port'] ?? 5432;
+            $this->db_name = ltrim($url['path'], '/');
+            $this->username = $url['user'];
+            $this->password = $url['pass'];
+        } else {
+            // Fallback com credenciais diretas (caso environment variable não esteja configurada)
+            $this->host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
+            $this->port = 5432;
+            $this->db_name = 'neondb';
+            $this->username = 'neondb_owner';
+            $this->password = 'npg_wX2ZKyd9tRbe';
+        }
     }
 
     public function getConnection() {
@@ -43,7 +56,11 @@ class Database {
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         } catch(PDOException $exception) {
-            sendResponse(['error' => 'Erro de conexão: ' . $exception->getMessage()], 500);
+            sendResponse([
+                'error' => 'Erro de conexão com banco de dados',
+                'details' => $exception->getMessage(),
+                'config_method' => getenv('DATABASE_URL') ? 'Environment Variable' : 'Fallback'
+            ], 500);
         }
         return $this->conn;
     }
@@ -203,6 +220,15 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Session management
 session_start();
 
+// Authentication helper
+function requireAuth() {
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Não autenticado']);
+        exit();
+    }
+}
+
 // Route handling
 switch ($endpoint) {
     case 'test':
@@ -213,9 +239,10 @@ switch ($endpoint) {
             'method' => $method,
             'php_version' => phpversion(),
             'database_connected' => $db ? true : false,
-            'neon_host' => 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech',
-            'database' => 'Fresh Database with Auto-Created Tables',
-            'tables_created' => 'Automatically on first run'
+            'config_method' => getenv('DATABASE_URL') ? 'Environment Variable (Secure)' : 'Fallback (Direct)',
+            'environment' => 'Production',
+            'neon_connected' => $db ? 'Yes' : 'No',
+            'tables_auto_created' => 'Yes'
         ]);
         break;
 
