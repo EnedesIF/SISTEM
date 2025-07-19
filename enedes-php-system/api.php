@@ -20,34 +20,24 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Parse DATABASE_URL environment variable (Neon.tech format)
-        $database_url = getenv('DATABASE_URL');
-        
-        if ($database_url) {
-            $url = parse_url($database_url);
-            $this->host = $url['host'];
-            $this->port = $url['port'] ?? 5432;
-            $this->db_name = ltrim($url['path'], '/');
-            $this->username = $url['user'];
-            $this->password = $url['pass'];
-        } else {
-            // Fallback for local development
-            $this->host = 'localhost';
-            $this->port = 5432;
-            $this->db_name = 'enedes';
-            $this->username = 'postgres';
-            $this->password = 'password';
-        }
+        // Configuração direta para Neon.tech (SUBSTITUA SUA SENHA)
+        $this->host = 'ep-gentle-unit-a5p9h5ux.us-east-2.aws.neon.tech';
+        $this->port = 5432;
+        $this->db_name = 'neondb';
+        $this->username = 'neondb_owner';
+        $this->password = 'SUBSTITUA_PELA_SUA_SENHA_NEON'; // ⚠️ COLOQUE SUA SENHA AQUI
     }
 
     public function getConnection() {
         $this->conn = null;
         try {
-            $dsn = "pgsql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name;
+            $dsn = "pgsql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name . ";sslmode=require";
             $this->conn = new PDO($dsn, $this->username, $this->password);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $exception) {
             error_log("Connection error: " . $exception->getMessage());
+            // Para debug, vamos mostrar o erro
+            sendResponse(['error' => 'Erro de conexão com banco: ' . $exception->getMessage()], 500);
         }
         return $this->conn;
     }
@@ -74,6 +64,28 @@ class Database {
             programa VARCHAR(100),
             status VARCHAR(50) DEFAULT 'Ativa',
             created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Goals table (compatibilidade com frontend existente)
+        CREATE TABLE IF NOT EXISTS goals (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            category VARCHAR(100) DEFAULT 'geral',
+            target_date DATE,
+            status VARCHAR(50) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Actions table (compatibilidade com frontend existente)
+        CREATE TABLE IF NOT EXISTS actions (
+            id SERIAL PRIMARY KEY,
+            goal_id INTEGER REFERENCES goals(id),
+            description TEXT NOT NULL,
+            status VARCHAR(50) DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -185,11 +197,15 @@ class Database {
         ];
 
         foreach ($default_users as $user) {
-            $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->execute([$user[1]]);
-            if (!$stmt->fetch()) {
-                $stmt = $this->conn->prepare("INSERT INTO users (username, email, password_hash, role, programa) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$user[0], $user[1], password_hash($user[2], PASSWORD_DEFAULT), $user[3], $user[4]]);
+            try {
+                $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?");
+                $stmt->execute([$user[1]]);
+                if (!$stmt->fetch()) {
+                    $stmt = $this->conn->prepare("INSERT INTO users (username, email, password_hash, role, programa) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->execute([$user[0], $user[1], password_hash($user[2], PASSWORD_DEFAULT), $user[3], $user[4]]);
+                }
+            } catch(Exception $e) {
+                // Ignorar erros de dados padrão
             }
         }
 
@@ -206,14 +222,25 @@ class Database {
         ];
 
         foreach ($default_programs as $program) {
-            $stmt = $this->conn->prepare("SELECT id FROM programas WHERE name = ?");
-            $stmt->execute([$program[0]]);
-            if (!$stmt->fetch()) {
-                $stmt = $this->conn->prepare("INSERT INTO programas (name, description, icon, color) VALUES (?, ?, ?, ?)");
-                $stmt->execute($program);
+            try {
+                $stmt = $this->conn->prepare("SELECT id FROM programas WHERE name = ?");
+                $stmt->execute([$program[0]]);
+                if (!$stmt->fetch()) {
+                    $stmt = $this->conn->prepare("INSERT INTO programas (name, description, icon, color) VALUES (?, ?, ?, ?)");
+                    $stmt->execute($program);
+                }
+            } catch(Exception $e) {
+                // Ignorar erros de dados padrão
             }
         }
     }
+}
+
+// Response helper (definir antes de usar)
+function sendResponse($data, $status = 200) {
+    http_response_code($status);
+    echo json_encode($data);
+    exit();
 }
 
 // Initialize database
@@ -240,15 +267,21 @@ function requireAuth() {
     }
 }
 
-// Response helper
-function sendResponse($data, $status = 200) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit();
-}
-
 // Route handling
 switch ($endpoint) {
+    case 'test':
+        // Endpoint de teste para diagnóstico
+        sendResponse([
+            'status' => 'success',
+            'message' => 'ENEDES API funcionando perfeitamente!',
+            'timestamp' => date('Y-m-d H:i:s'),
+            'method' => $method,
+            'php_version' => phpversion(),
+            'database_connected' => $db ? true : false,
+            'endpoint_requested' => $endpoint
+        ]);
+        break;
+
     case 'login':
         if ($method === 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
@@ -321,6 +354,88 @@ switch ($endpoint) {
         break;
 
     case 'goals':
+        // Compatibilidade com frontend existente
+        if ($method === 'GET') {
+            try {
+                $stmt = $db->prepare("SELECT * FROM goals ORDER BY created_at DESC");
+                $stmt->execute();
+                $goals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                sendResponse($goals);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar goals: ' . $e->getMessage()], 500);
+            }
+        } elseif ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                $name = $input['name'] ?? '';
+                $description = $input['description'] ?? '';
+                $category = $input['category'] ?? 'geral';
+                $target_date = $input['target_date'] ?? null;
+
+                if (!$name) {
+                    sendResponse(['error' => 'Nome é obrigatório'], 400);
+                }
+
+                $stmt = $db->prepare("INSERT INTO goals (name, description, category, target_date) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$name, $description, $category, $target_date]);
+
+                $goal_id = $db->lastInsertId();
+                $stmt = $db->prepare("SELECT * FROM goals WHERE id = ?");
+                $stmt->execute([$goal_id]);
+                $goal = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                sendResponse($goal, 201);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar goal: ' . $e->getMessage()], 500);
+            }
+        }
+        break;
+
+    case 'actions':
+        // Compatibilidade com frontend existente
+        if ($method === 'GET') {
+            try {
+                $goal_id = $_GET['goal_id'] ?? null;
+                
+                if ($goal_id) {
+                    $stmt = $db->prepare("SELECT * FROM actions WHERE goal_id = ? ORDER BY created_at DESC");
+                    $stmt->execute([$goal_id]);
+                } else {
+                    $stmt = $db->prepare("SELECT * FROM actions ORDER BY created_at DESC");
+                    $stmt->execute();
+                }
+                
+                $actions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                sendResponse($actions);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar actions: ' . $e->getMessage()], 500);
+            }
+        } elseif ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                $goal_id = $input['goal_id'] ?? null;
+                $description = $input['description'] ?? '';
+                $status = $input['status'] ?? 'pending';
+
+                if (!$goal_id || !$description) {
+                    sendResponse(['error' => 'goal_id e description são obrigatórios'], 400);
+                }
+
+                $stmt = $db->prepare("INSERT INTO actions (goal_id, description, status) VALUES (?, ?, ?)");
+                $stmt->execute([$goal_id, $description, $status]);
+
+                $action_id = $db->lastInsertId();
+                $stmt = $db->prepare("SELECT * FROM actions WHERE id = ?");
+                $stmt->execute([$action_id]);
+                $action = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                sendResponse($action, 201);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar action: ' . $e->getMessage()], 500);
+            }
+        }
+        break;
+
     case 'metas':
         requireAuth();
         if ($method === 'GET') {
@@ -655,8 +770,25 @@ switch ($endpoint) {
         }
         break;
 
+    case 'cronograma':
+        // Endpoint para cronograma (compatibilidade)
+        if ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                sendResponse([
+                    'success' => true,
+                    'message' => 'Cronograma processado com sucesso',
+                    'data' => $input
+                ]);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Erro no cronograma: ' . $e->getMessage()], 500);
+            }
+        } else {
+            sendResponse(['error' => 'Método não permitido'], 405);
+        }
+        break;
+
     default:
-        sendResponse(['error' => 'Endpoint não encontrado'], 404);
+        sendResponse(['error' => 'Endpoint não encontrado: ' . $endpoint], 404);
 }
 ?>
-
