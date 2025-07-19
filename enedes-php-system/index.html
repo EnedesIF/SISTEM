@@ -967,10 +967,8 @@
                     const workingEndpoints = endpointResults.filter(r => r.available).length;
                     const totalEndpoints = endpointResults.length;
                     
-                    if (endpointResults.filter(r => r.available).length >= 2) {
-                        showToast(`🚀 Backend expandido! ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
-                    } else if (workingEndpoints > 0) {
-                        showToast(`🌐 Backend parcial: ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
+                    if (workingEndpoints > 0) {
+                        showToast(`🌐 Backend conectado! ${workingEndpoints}/${totalEndpoints} endpoints funcionais`, "success");
                     } else {
                         OFFLINE_MODE = true;
                         showToast("⚠️ Backend conectado mas endpoints indisponíveis", "warning");
@@ -1214,7 +1212,7 @@
                     try {
                         const data = JSON.parse(localStorage.getItem(storageKey) || '[]');
                         dataResults[key] = { data };
-                        console.log(`✅ ${key} carregado do LOCALSTORAGE:`, data.length, 'itens');
+                        console.log(`✅ ${key} carregado do localStorage:`, data.length, 'itens');
                     } catch (error) {
                         console.log(`⚠️ Erro ao carregar ${key}:`, error.message);
                         dataResults[key] = { data: [] };
