@@ -707,14 +707,11 @@
 
     <script>
         // ========================================
-        // CONFIGURAÇÃO DO BACKEND
+        // CONFIGURAÇÃO DO BACKEND - ✅ CORRIGIDO PARA CONECTAR COM NEON
         // ========================================
         
-        // 🔧 CONFIGURAÇÃO: Altere para usar seu backend ou deixe vazio para modo offline
-        // Exemplos:
-        // - Backend ativo: 'https://seu-backend.onrender.com'
-        // - Modo offline: '' (string vazia)
-        const API_BASE_URL = 'https://sistem-lk86.onrender.com'; // Backend ativo
+        // 🔧 CONFIGURAÇÃO ATIVA: Backend integrado com banco Neon
+        const API_BASE_URL = 'https://sistem-lk86.onrender.com'; // ✅ BACKEND ATIVO!
         
         // Sistema híbrido: Backend + LocalStorage fallback
         let OFFLINE_MODE = !API_BASE_URL; // true = offline, false = backend
@@ -3612,4 +3609,242 @@
                     metas,
                     cronograma,
                     inventario,
-                    export
+                    exportDate: new Date().toISOString(),
+                    exportedBy: currentUser.name,
+                    systemInfo: {
+                        version: "2.0 Híbrido",
+                        mode: OFFLINE_MODE ? "Offline (localStorage)" : "Online (Backend + Neon)",
+                        backend: API_BASE_URL || "Não configurado",
+                        source: OFFLINE_MODE ? "localStorage" : "API Integration"
+                    }
+                };
+                
+                const dataStr = JSON.stringify(data, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `enedes_export_${OFFLINE_MODE ? 'offline' : 'online'}_${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                
+                await logActivity(`Dados exportados (${OFFLINE_MODE ? 'offline' : 'online'})`, "info", "download");
+                showToast("Dados exportados com sucesso!", "success");
+            } catch (error) {
+                showToast("Erro ao exportar dados", "error");
+            }
+        }
+
+        function logout() {
+            if (confirm("Tem certeza que deseja sair?")) {
+                currentUser = null;
+                document.getElementById("mainApp").classList.add("hidden");
+                document.getElementById("loginModal").classList.remove("hidden");
+                document.getElementById("userSelect").value = "";
+                document.getElementById("passwordInput").value = "";
+                document.getElementById("meuProgramaTab").classList.add("hidden");
+                showToast("Logout realizado com sucesso!", "success");
+            }
+        }
+
+        // Funções auxiliares para upload de arquivos
+        function displaySelectedFiles(files, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'flex items-center justify-between p-2 bg-blue-50 rounded border text-xs';
+                fileDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i data-lucide="file" class="w-3 h-3 mr-2 text-blue-600"></i>
+                        <span class="text-blue-800">${file.name}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-gray-500">${formatFileSize(file.size)}</span>
+                        <button type="button" onclick="removeSelectedFile(${i}, '${containerId}')" class="text-red-500 hover:text-red-700">
+                            <i data-lucide="x" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(fileDiv);
+            }
+            
+            createIcons();
+        }
+
+        function removeSelectedFile(index, containerId) {
+            const fileInput = document.getElementById(containerId.replace('List', ''));
+            if (!fileInput) return;
+            
+            const dt = new DataTransfer();
+            const files = fileInput.files;
+            
+            for (let i = 0; i < files.length; i++) {
+                if (i !== index) {
+                    dt.items.add(files[i]);
+                }
+            }
+            
+            fileInput.files = dt.files;
+            displaySelectedFiles(fileInput.files, containerId);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function downloadFile(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ========================================
+        // FUNÇÕES DE ÍCONES E INTERFACE
+        // ========================================
+        
+        // Função para criar ícones com fallback robusto
+        function createIcons() {
+            // Se Lucide estiver carregado, usar ele
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                try {
+                    lucide.createIcons();
+                    return true;
+                } catch (error) {
+                    console.warn('Erro ao criar ícones Lucide:', error);
+                }
+            }
+            
+            // Fallback: substituir todos os data-lucide por emojis
+            const elements = document.querySelectorAll('[data-lucide]');
+            elements.forEach(element => {
+                const iconName = element.getAttribute('data-lucide');
+                const iconText = window.getIcon(iconName);
+                
+                // Limpar conteúdo e adicionar emoji
+                element.innerHTML = '';
+                element.textContent = iconText;
+                element.style.fontSize = '16px';
+                element.style.display = 'inline-block';
+                element.style.width = '16px';
+                element.style.height = '16px';
+                element.style.textAlign = 'center';
+                element.classList.add('icon-fallback');
+            });
+            
+            return false;
+        }
+
+        // Função para inserir ícone inline (substitui <i data-lucide="...">)
+        function iconHtml(iconName, className = 'w-4 h-4 inline') {
+            if (window.lucideLoaded) {
+                return `<i data-lucide="${iconName}" class="${className}"></i>`;
+            } else {
+                const emoji = window.getIcon(iconName);
+                return `<span class="icon-fallback ${className}">${emoji}</span>`;
+            }
+        }
+
+        // Aguardar carregamento com timeout mais curto
+        function waitForScripts() {
+            return new Promise((resolve) => {
+                let attempts = 0;
+                const maxAttempts = 20; // 2 segundos máximo
+                
+                const checkScripts = () => {
+                    attempts++;
+                    
+                    // Não bloquear por scripts externos - continuar após timeout
+                    if (attempts >= maxAttempts) {
+                        console.log('⏱️ Timeout - continuando sem aguardar scripts externos');
+                        resolve();
+                        return;
+                    }
+                    
+                    // Se ambos carregaram, ótimo
+                    if ((window.lucideLoaded === true || window.lucideLoaded === false) && 
+                        (window.chartLoaded === true || window.chartLoaded === false)) {
+                        console.log('📋 Scripts verificados:', {
+                            lucide: window.lucideLoaded ? '✅' : '❌ (usando fallback)',
+                            chart: window.chartLoaded ? '✅' : '❌ (usando CSS)'
+                        });
+                        resolve();
+                    } else {
+                        setTimeout(checkScripts, 100);
+                    }
+                };
+                checkScripts();
+            });
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                console.log('🚀 Iniciando Sistema ENEDES...');
+                
+                // Aguardar carregamento dos scripts (com timeout)
+                await waitForScripts();
+                
+                // Inicializar ícones (com ou sem Lucide)
+                const iconsWorking = createIcons();
+                
+                // Verificar status dos scripts
+                const lucideStatus = window.lucideLoaded ? '✅ Carregado' : '❌ Fallback ativo';
+                const chartStatus = window.chartLoaded ? '✅ Carregado' : '❌ CSS charts ativo';
+                
+                console.log('📊 Status dos componentes:');
+                console.log('  Lucide Icons:', lucideStatus);
+                console.log('  Chart.js:', chartStatus);
+                console.log('  Sistema:', '✅ Funcional');
+                
+                // Configurar indicadores visuais
+                updateScriptStatus();
+                
+                // Mensagem de inicialização baseada no modo
+                let initMessage = "Sistema ENEDES carregado";
+                let messageType = "info";
+                
+                if (!window.lucideLoaded && !window.chartLoaded) {
+                    initMessage += " - Modo compatibilidade total (Emoji + CSS)";
+                    messageType = "warning";
+                } else if (!window.lucideLoaded || !window.chartLoaded) {
+                    initMessage += " - Modo compatibilidade parcial";
+                    messageType = "warning";
+                } else {
+                    initMessage += " - Todos recursos carregados";
+                    messageType = "success";
+                }
+                
+                if (API_BASE_URL) {
+                    initMessage += " | Tentará conectar ao backend";
+                } else {
+                    initMessage += " | Modo offline configurado";
+                }
+                
+                showToast(initMessage, messageType);
+                
+                // Toast adicional sobre compatibilidade se necessário
+                if (!window.lucideLoaded || !window.chartLoaded) {
+                    setTimeout(() => {
+                        showToast("💡 Sistema funcionando com fallbacks - 100% funcional!", "info");
+                    }, 3000);
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro na inicialização:', error);
+                showToast("Sistema carregado com limitações", "warning");
+            }
+        });
+    </script>
+</body>
+</html>
