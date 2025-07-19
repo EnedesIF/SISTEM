@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Response helper (definir antes de usar)
+// Response helper
 function sendResponse($data, $status = 200) {
     http_response_code($status);
     echo json_encode($data);
@@ -27,7 +27,7 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Configuração correta para seu Neon.tech
+        // Usando o banco vazio com senha conhecida
         $this->host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
         $this->port = 5432;
         $this->db_name = 'neondb';
@@ -43,7 +43,6 @@ class Database {
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         } catch(PDOException $exception) {
-            error_log("Connection error: " . $exception->getMessage());
             sendResponse(['error' => 'Erro de conexão: ' . $exception->getMessage()], 500);
         }
         return $this->conn;
@@ -51,7 +50,7 @@ class Database {
 
     public function initializeTables() {
         $sql = "
-        -- Goals table (compatibilidade com frontend existente)
+        -- Goals table (principal para o frontend)
         CREATE TABLE IF NOT EXISTS goals (
             id SERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
@@ -63,10 +62,10 @@ class Database {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Actions table (compatibilidade com frontend existente)
+        -- Actions table
         CREATE TABLE IF NOT EXISTS actions (
             id SERIAL PRIMARY KEY,
-            goal_id INTEGER REFERENCES goals(id),
+            goal_id INTEGER REFERENCES goals(id) ON DELETE CASCADE,
             description TEXT NOT NULL,
             status VARCHAR(50) DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -85,7 +84,7 @@ class Database {
             is_active BOOLEAN DEFAULT TRUE
         );
 
-        -- Metas table
+        -- Metas table (sistema original)
         CREATE TABLE IF NOT EXISTS metas (
             id SERIAL PRIMARY KEY,
             titulo VARCHAR(200) NOT NULL,
@@ -181,62 +180,10 @@ class Database {
 
         try {
             $this->conn->exec($sql);
-            $this->initializeDefaultData();
+            return true;
         } catch(PDOException $exception) {
             error_log("Table creation error: " . $exception->getMessage());
-        }
-    }
-
-    private function initializeDefaultData() {
-        // Insert default users
-        $default_users = [
-            ['Coordenação Geral', 'coordenacao@enedes.com', '123456', 'coordenador_geral', null],
-            ['IFB Mais Empreendedor', 'empreendedor@enedes.com', '123456', 'coordenador_programa', 'IFB Mais Empreendedor'],
-            ['Rota Empreendedora', 'rota@enedes.com', '123456', 'coordenador_programa', 'Rota Empreendedora'],
-            ['Lab Varejo', 'varejo@enedes.com', '123456', 'coordenador_programa', 'Lab Varejo'],
-            ['Lab Consumer', 'consumer@enedes.com', '123456', 'coordenador_programa', 'Lab Consumer'],
-            ['Estúdio', 'estudio@enedes.com', '123456', 'coordenador_programa', 'Estúdio'],
-            ['IFB Digital', 'digital@enedes.com', '123456', 'coordenador_programa', 'IFB Digital'],
-            ['Sala Interativa', 'sala@enedes.com', '123456', 'coordenador_programa', 'Sala Interativa'],
-            ['Agência de Marketing', 'marketing@enedes.com', '123456', 'coordenador_programa', 'Agência de Marketing']
-        ];
-
-        foreach ($default_users as $user) {
-            try {
-                $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?");
-                $stmt->execute([$user[1]]);
-                if (!$stmt->fetch()) {
-                    $stmt = $this->conn->prepare("INSERT INTO users (username, email, password_hash, role, programa) VALUES (?, ?, ?, ?, ?)");
-                    $stmt->execute([$user[0], $user[1], password_hash($user[2], PASSWORD_DEFAULT), $user[3], $user[4]]);
-                }
-            } catch(Exception $e) {
-                // Ignorar erros de dados padrão
-            }
-        }
-
-        // Insert default programs
-        $default_programs = [
-            ['IFB Mais Empreendedor', 'Programa IFB Mais Empreendedor', 'lightbulb', 'blue'],
-            ['Rota Empreendedora', 'Programa Rota Empreendedora', 'map', 'green'],
-            ['Lab Varejo', 'Programa Lab Varejo', 'shopping-cart', 'purple'],
-            ['Lab Consumer', 'Programa Lab Consumer', 'users', 'pink'],
-            ['Estúdio', 'Programa Estúdio', 'camera', 'red'],
-            ['IFB Digital', 'Programa IFB Digital', 'monitor', 'indigo'],
-            ['Sala Interativa', 'Programa Sala Interativa', 'presentation', 'yellow'],
-            ['Agência de Marketing', 'Programa Agência de Marketing', 'megaphone', 'orange']
-        ];
-
-        foreach ($default_programs as $program) {
-            try {
-                $stmt = $this->conn->prepare("SELECT id FROM programas WHERE name = ?");
-                $stmt->execute([$program[0]]);
-                if (!$stmt->fetch()) {
-                    $stmt = $this->conn->prepare("INSERT INTO programas (name, description, icon, color) VALUES (?, ?, ?, ?)");
-                    $stmt->execute($program);
-                }
-            } catch(Exception $e) {
-                // Ignorar erros de dados padrão
-            }
+            return false;
         }
     }
 }
@@ -256,15 +203,6 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Session management
 session_start();
 
-// Authentication helper
-function requireAuth() {
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Não autenticado']);
-        exit();
-    }
-}
-
 // Route handling
 switch ($endpoint) {
     case 'test':
@@ -276,7 +214,8 @@ switch ($endpoint) {
             'php_version' => phpversion(),
             'database_connected' => $db ? true : false,
             'neon_host' => 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech',
-            'system' => 'ENEDES v2.0'
+            'database' => 'Fresh Database with Auto-Created Tables',
+            'tables_created' => 'Automatically on first run'
         ]);
         break;
 
@@ -348,11 +287,6 @@ switch ($endpoint) {
                     sendResponse(['error' => 'ID é obrigatório'], 400);
                 }
 
-                // Deletar ações relacionadas primeiro
-                $stmt = $db->prepare("DELETE FROM actions WHERE goal_id = ?");
-                $stmt->execute([$id]);
-
-                // Deletar goal
                 $stmt = $db->prepare("DELETE FROM goals WHERE id = ?");
                 $stmt->execute([$id]);
 
@@ -443,95 +377,6 @@ switch ($endpoint) {
             } catch(PDOException $e) {
                 sendResponse(['error' => 'Erro ao deletar action: ' . $e->getMessage()], 500);
             }
-        }
-        break;
-
-    case 'login':
-        if ($method === 'POST') {
-            $input = json_decode(file_get_contents('php://input'), true);
-            $username = $input['username'] ?? '';
-            $password = $input['password'] ?? '';
-
-            if (!$username || !$password) {
-                sendResponse(['error' => 'Username e password são obrigatórios'], 400);
-            }
-
-            $stmt = $db->prepare("SELECT * FROM users WHERE username = ? AND is_active = TRUE");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
-
-            if (!$user || !password_verify($password, $user['password_hash'])) {
-                sendResponse(['error' => 'Credenciais inválidas'], 401);
-            }
-
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['programa'] = $user['programa'];
-
-            sendResponse([
-                'message' => 'Login realizado com sucesso',
-                'user' => [
-                    'id' => $user['id'],
-                    'username' => $user['username'],
-                    'role' => $user['role'],
-                    'programa' => $user['programa']
-                ]
-            ]);
-        }
-        break;
-
-    case 'logout':
-        if ($method === 'POST') {
-            session_destroy();
-            sendResponse(['message' => 'Logout realizado com sucesso']);
-        }
-        break;
-
-    case 'users':
-        if ($method === 'GET') {
-            $stmt = $db->prepare("SELECT id, username, role, programa FROM users WHERE is_active = TRUE ORDER BY username");
-            $stmt->execute();
-            $users = $stmt->fetchAll();
-            sendResponse($users);
-        }
-        break;
-
-    case 'metas':
-        requireAuth();
-        if ($method === 'GET') {
-            $user_role = $_SESSION['role'];
-            $user_programa = $_SESSION['programa'];
-
-            if ($user_role === 'coordenador_geral') {
-                $stmt = $db->prepare("SELECT * FROM metas ORDER BY created_at DESC");
-                $stmt->execute();
-            } else {
-                $stmt = $db->prepare("SELECT * FROM metas WHERE programa = ? ORDER BY created_at DESC");
-                $stmt->execute([$user_programa]);
-            }
-
-            $metas = $stmt->fetchAll();
-            sendResponse($metas);
-        } elseif ($method === 'POST') {
-            $input = json_decode(file_get_contents('php://input'), true);
-            $titulo = $input['titulo'] ?? '';
-            $objetivo_social = $input['objetivo_social'] ?? '';
-            $programa = $input['programa'] ?? '';
-
-            if (!$titulo || !$objetivo_social) {
-                sendResponse(['error' => 'Título e objetivo social são obrigatórios'], 400);
-            }
-
-            $stmt = $db->prepare("INSERT INTO metas (titulo, objetivo_social, programa, created_by) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$titulo, $objetivo_social, $programa, $_SESSION['user_id']]);
-
-            $meta_id = $db->lastInsertId();
-            $stmt = $db->prepare("SELECT * FROM metas WHERE id = ?");
-            $stmt->execute([$meta_id]);
-            $meta = $stmt->fetch();
-
-            sendResponse($meta, 201);
         }
         break;
 
