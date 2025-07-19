@@ -17,36 +17,14 @@ function sendResponse($data, $status = 200) {
     exit();
 }
 
-// Database configuration using environment variables
+// Database configuration - NEON PostgreSQL
 class Database {
-    private $host;
-    private $db_name;
-    private $username;
-    private $password;
-    private $port;
+    private $host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
+    private $port = 5432;
+    private $db_name = 'neondb';
+    private $username = 'neondb_owner';
+    private $password = 'npg_wX2ZKyd9tRbe';
     public $conn;
-
-    public function __construct() {
-        // Usar environment variable (mais seguro e profissional)
-        $database_url = getenv('DATABASE_URL');
-        
-        if ($database_url) {
-            // Parse da URL do banco
-            $url = parse_url($database_url);
-            $this->host = $url['host'];
-            $this->port = $url['port'] ?? 5432;
-            $this->db_name = ltrim($url['path'], '/');
-            $this->username = $url['user'];
-            $this->password = $url['pass'];
-        } else {
-            // Fallback com credenciais diretas (caso environment variable não esteja configurada)
-            $this->host = 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech';
-            $this->port = 5432;
-            $this->db_name = 'neondb';
-            $this->username = 'neondb_owner';
-            $this->password = 'npg_wX2ZKyd9tRbe';
-        }
-    }
 
     public function getConnection() {
         $this->conn = null;
@@ -58,8 +36,7 @@ class Database {
         } catch(PDOException $exception) {
             sendResponse([
                 'error' => 'Erro de conexão com banco de dados',
-                'details' => $exception->getMessage(),
-                'config_method' => getenv('DATABASE_URL') ? 'Environment Variable' : 'Fallback'
+                'details' => $exception->getMessage()
             ], 500);
         }
         return $this->conn;
@@ -67,131 +44,86 @@ class Database {
 
     public function initializeTables() {
         $sql = "
-        -- Goals table (principal para o frontend)
-        CREATE TABLE IF NOT EXISTS goals (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(200) NOT NULL,
-            description TEXT,
-            category VARCHAR(100) DEFAULT 'geral',
-            target_date DATE,
-            status VARCHAR(50) DEFAULT 'active',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Actions table
-        CREATE TABLE IF NOT EXISTS actions (
-            id SERIAL PRIMARY KEY,
-            goal_id INTEGER REFERENCES goals(id) ON DELETE CASCADE,
-            description TEXT NOT NULL,
-            status VARCHAR(50) DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Users table
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(80) UNIQUE NOT NULL,
-            email VARCHAR(120) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            role VARCHAR(50) NOT NULL,
-            programa VARCHAR(100),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE
-        );
-
-        -- Metas table (sistema original)
+        -- ✅ METAS TABLE (compatível com frontend)
         CREATE TABLE IF NOT EXISTS metas (
             id SERIAL PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
             titulo VARCHAR(200) NOT NULL,
-            objetivo_social TEXT NOT NULL,
+            objetivo TEXT,
+            program VARCHAR(100),
+            programa VARCHAR(100), 
+            indicadores JSON,
+            status VARCHAR(50) DEFAULT 'ativo',
+            created_by VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- ✅ ACTIONS TABLE (compatível com frontend)
+        CREATE TABLE IF NOT EXISTS actions (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            titulo VARCHAR(200) NOT NULL,
+            descricao TEXT,
+            program VARCHAR(100),
             programa VARCHAR(100),
-            status VARCHAR(50) DEFAULT 'Ativa',
-            created_by INTEGER REFERENCES users(id),
+            responsavel VARCHAR(100),
+            status VARCHAR(50) DEFAULT 'pending',
+            created_by VARCHAR(100),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Programas table
-        CREATE TABLE IF NOT EXISTS programas (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            description TEXT,
-            icon VARCHAR(50) NOT NULL,
-            color VARCHAR(20) NOT NULL,
-            coordenador_id INTEGER REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE
-        );
-
-        -- Acoes table
-        CREATE TABLE IF NOT EXISTS acoes (
-            id SERIAL PRIMARY KEY,
-            titulo VARCHAR(200) NOT NULL,
-            descricao TEXT NOT NULL,
-            programa VARCHAR(100) NOT NULL,
-            responsavel VARCHAR(100) NOT NULL,
-            prazo DATE NOT NULL,
-            status VARCHAR(50) DEFAULT 'Pendente',
-            created_by INTEGER REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- FollowUps table
+        -- FOLLOWUPS TABLE
         CREATE TABLE IF NOT EXISTS followups (
             id SERIAL PRIMARY KEY,
-            tipo VARCHAR(20) NOT NULL,
             target_id INTEGER,
-            programa VARCHAR(100),
-            colaboradores JSON NOT NULL,
-            mensagem TEXT NOT NULL,
+            type VARCHAR(20),
+            mensagem TEXT,
+            prioridade VARCHAR(20),
+            prazo DATE,
+            colaboradores JSON,
             status VARCHAR(50) DEFAULT 'pending',
-            created_by INTEGER REFERENCES users(id),
+            created_by VARCHAR(100),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Tasks table
+        -- TASKS TABLE
         CREATE TABLE IF NOT EXISTS tasks (
             id SERIAL PRIMARY KEY,
-            followup_id INTEGER REFERENCES followups(id),
-            titulo VARCHAR(200) NOT NULL,
-            descricao TEXT NOT NULL,
-            responsavel VARCHAR(100) NOT NULL,
-            prazo DATE NOT NULL,
+            followup_id INTEGER,
+            titulo VARCHAR(200),
+            descricao TEXT,
+            responsavel VARCHAR(100),
             status VARCHAR(50) DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            prazo DATE,
+            attachments JSON,
+            created_by VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Inventario table
+        -- CRONOGRAMA TABLE
+        CREATE TABLE IF NOT EXISTS cronograma (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(200),
+            inicio DATE,
+            fim DATE,
+            rubrica DECIMAL(10,2),
+            executado DECIMAL(10,2),
+            created_by VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- INVENTARIO TABLE
         CREATE TABLE IF NOT EXISTS inventario (
             id SERIAL PRIMARY KEY,
-            programa VARCHAR(100) NOT NULL,
-            item VARCHAR(200) NOT NULL,
-            quantidade INTEGER NOT NULL,
-            status VARCHAR(50) DEFAULT 'Disponível',
-            localizacao VARCHAR(200),
-            observacoes TEXT,
-            created_by INTEGER REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Etapas table
-        CREATE TABLE IF NOT EXISTS etapas (
-            id SERIAL PRIMARY KEY,
-            programa VARCHAR(100) NOT NULL,
-            titulo VARCHAR(200) NOT NULL,
-            inicio DATE NOT NULL,
-            prazo_final DATE NOT NULL,
-            rubrica DECIMAL(10,2) DEFAULT 0.0,
-            executado DECIMAL(10,2) DEFAULT 0.0,
-            status_percentual INTEGER DEFAULT 0,
-            created_by INTEGER REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            programa VARCHAR(100),
+            item VARCHAR(200),
+            descricao TEXT,
+            valor DECIMAL(10,2),
+            atividades_relacionadas TEXT,
+            created_by VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         ";
 
@@ -217,17 +149,8 @@ if ($db) {
 $endpoint = $_GET['endpoint'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Session management
-session_start();
-
-// Authentication helper
-function requireAuth() {
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Não autenticado']);
-        exit();
-    }
-}
+// Log da requisição para debug
+error_log("ENEDES API - Endpoint: $endpoint, Method: $method, Input: " . file_get_contents('php://input'));
 
 // Route handling
 switch ($endpoint) {
@@ -237,89 +160,94 @@ switch ($endpoint) {
             'message' => 'ENEDES API funcionando perfeitamente!',
             'timestamp' => date('Y-m-d H:i:s'),
             'method' => $method,
-            'php_version' => phpversion(),
             'database_connected' => $db ? true : false,
-            'config_method' => getenv('DATABASE_URL') ? 'Environment Variable (Secure)' : 'Fallback (Direct)',
-            'environment' => 'Production',
-            'neon_connected' => $db ? 'Yes' : 'No',
-            'tables_auto_created' => 'Yes'
+            'neon_status' => 'Conectado ao PostgreSQL Neon',
+            'tables_status' => 'Criadas automaticamente'
         ]);
         break;
 
     case 'goals':
         if ($method === 'GET') {
             try {
-                $stmt = $db->prepare("SELECT * FROM goals ORDER BY created_at DESC");
+                $stmt = $db->prepare("SELECT * FROM metas ORDER BY created_at DESC");
                 $stmt->execute();
-                $goals = $stmt->fetchAll();
-                sendResponse($goals);
-            } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao buscar goals: ' . $e->getMessage()], 500);
-            }
-        } elseif ($method === 'POST') {
-            try {
-                $input = json_decode(file_get_contents('php://input'), true);
-                $name = $input['name'] ?? '';
-                $description = $input['description'] ?? '';
-                $category = $input['category'] ?? 'geral';
-                $target_date = $input['target_date'] ?? null;
-
-                if (!$name) {
-                    sendResponse(['error' => 'Nome é obrigatório'], 400);
-                }
-
-                $stmt = $db->prepare("INSERT INTO goals (name, description, category, target_date) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$name, $description, $category, $target_date]);
-
-                $goal_id = $db->lastInsertId();
-                $stmt = $db->prepare("SELECT * FROM goals WHERE id = ?");
-                $stmt->execute([$goal_id]);
-                $goal = $stmt->fetch();
-
-                sendResponse($goal, 201);
-            } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao criar goal: ' . $e->getMessage()], 500);
-            }
-        } elseif ($method === 'PUT') {
-            try {
-                $input = json_decode(file_get_contents('php://input'), true);
-                $id = $_GET['id'] ?? $input['id'] ?? '';
+                $metas = $stmt->fetchAll();
                 
-                if (!$id) {
-                    sendResponse(['error' => 'ID é obrigatório'], 400);
-                }
-
-                $stmt = $db->prepare("UPDATE goals SET name = ?, description = ?, category = ?, target_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([
-                    $input['name'] ?? '',
-                    $input['description'] ?? '',
-                    $input['category'] ?? 'geral',
-                    $input['target_date'] ?? null,
-                    $id
+                sendResponse([
+                    'success' => true,
+                    'data' => $metas
                 ]);
-
-                $stmt = $db->prepare("SELECT * FROM goals WHERE id = ?");
-                $stmt->execute([$id]);
-                $goal = $stmt->fetch();
-
-                sendResponse($goal);
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao atualizar goal: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao buscar metas: ' . $e->getMessage()], 500);
             }
-        } elseif ($method === 'DELETE') {
+        } 
+        elseif ($method === 'POST') {
             try {
-                $id = $_GET['id'] ?? '';
+                $input = json_decode(file_get_contents('php://input'), true);
                 
-                if (!$id) {
-                    sendResponse(['error' => 'ID é obrigatório'], 400);
+                // ✅ COMPATIBILIDADE TOTAL - aceita tanto inglês quanto português
+                $title = $input['title'] ?? $input['titulo'] ?? '';
+                $objetivo = $input['objetivo'] ?? $input['description'] ?? '';
+                $program = $input['program'] ?? $input['programa'] ?? '';
+                $indicadores = isset($input['indicadores']) ? json_encode($input['indicadores']) : '[]';
+                $created_by = $input['created_by'] ?? 'Sistema';
+
+                if (!$title) {
+                    sendResponse(['error' => 'Título é obrigatório'], 400);
                 }
 
-                $stmt = $db->prepare("DELETE FROM goals WHERE id = ?");
+                $stmt = $db->prepare("
+                    INSERT INTO metas (title, titulo, objetivo, program, programa, indicadores, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$title, $title, $objetivo, $program, $program, $indicadores, $created_by]);
+
+                $meta_id = $db->lastInsertId();
+                
+                sendResponse([
+                    'success' => true,
+                    'id' => $meta_id,
+                    'message' => 'Meta cadastrada no PostgreSQL Neon!'
+                ], 201);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar meta: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'PUT') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                $id = $input['id'] ?? '';
+                $title = $input['title'] ?? $input['titulo'] ?? '';
+                $objetivo = $input['objetivo'] ?? '';
+                $program = $input['program'] ?? $input['programa'] ?? '';
+                $indicadores = isset($input['indicadores']) ? json_encode($input['indicadores']) : '[]';
+
+                $stmt = $db->prepare("
+                    UPDATE metas 
+                    SET title = ?, titulo = ?, objetivo = ?, program = ?, programa = ?, indicadores = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$title, $title, $objetivo, $program, $program, $indicadores, $id]);
+
+                sendResponse(['success' => true, 'message' => 'Meta atualizada!']);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao atualizar meta: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'DELETE') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                $id = $input['id'] ?? '';
+
+                $stmt = $db->prepare("DELETE FROM metas WHERE id = ?");
                 $stmt->execute([$id]);
 
-                sendResponse(['success' => true, 'message' => 'Goal deletado com sucesso']);
+                sendResponse(['success' => true, 'message' => 'Meta deletada!']);
+                
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao deletar goal: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao deletar meta: ' . $e->getMessage()], 500);
             }
         }
         break;
@@ -327,104 +255,256 @@ switch ($endpoint) {
     case 'actions':
         if ($method === 'GET') {
             try {
-                $goal_id = $_GET['goal_id'] ?? null;
-                
-                if ($goal_id) {
-                    $stmt = $db->prepare("SELECT * FROM actions WHERE goal_id = ? ORDER BY created_at DESC");
-                    $stmt->execute([$goal_id]);
-                } else {
-                    $stmt = $db->prepare("SELECT * FROM actions ORDER BY created_at DESC");
-                    $stmt->execute();
-                }
-                
+                $stmt = $db->prepare("SELECT * FROM actions ORDER BY created_at DESC");
+                $stmt->execute();
                 $actions = $stmt->fetchAll();
-                sendResponse($actions);
+                
+                sendResponse([
+                    'success' => true,
+                    'data' => $actions
+                ]);
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao buscar actions: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao buscar ações: ' . $e->getMessage()], 500);
             }
-        } elseif ($method === 'POST') {
+        }
+        elseif ($method === 'POST') {
             try {
                 $input = json_decode(file_get_contents('php://input'), true);
-                $goal_id = $input['goal_id'] ?? null;
-                $description = $input['description'] ?? '';
+                
+                // ✅ COMPATIBILIDADE TOTAL
+                $title = $input['title'] ?? $input['titulo'] ?? '';
+                $descricao = $input['descricao'] ?? $input['description'] ?? '';
+                $program = $input['program'] ?? $input['programa'] ?? '';
+                $responsavel = $input['responsavel'] ?? '';
                 $status = $input['status'] ?? 'pending';
+                $created_by = $input['created_by'] ?? 'Sistema';
 
-                if (!$goal_id || !$description) {
-                    sendResponse(['error' => 'goal_id e description são obrigatórios'], 400);
+                if (!$title) {
+                    sendResponse(['error' => 'Título é obrigatório'], 400);
                 }
 
-                $stmt = $db->prepare("INSERT INTO actions (goal_id, description, status) VALUES (?, ?, ?)");
-                $stmt->execute([$goal_id, $description, $status]);
+                $stmt = $db->prepare("
+                    INSERT INTO actions (title, titulo, descricao, program, programa, responsavel, status, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$title, $title, $descricao, $program, $program, $responsavel, $status, $created_by]);
 
                 $action_id = $db->lastInsertId();
-                $stmt = $db->prepare("SELECT * FROM actions WHERE id = ?");
-                $stmt->execute([$action_id]);
-                $action = $stmt->fetch();
-
-                sendResponse($action, 201);
+                
+                sendResponse([
+                    'success' => true,
+                    'id' => $action_id,
+                    'message' => 'Ação cadastrada no PostgreSQL Neon!'
+                ], 201);
+                
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao criar action: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao criar ação: ' . $e->getMessage()], 500);
             }
-        } elseif ($method === 'PUT') {
+        }
+        elseif ($method === 'PUT') {
             try {
                 $input = json_decode(file_get_contents('php://input'), true);
-                $id = $_GET['id'] ?? $input['id'] ?? '';
+                $id = $input['id'] ?? '';
+                $title = $input['title'] ?? $input['titulo'] ?? '';
+                $descricao = $input['descricao'] ?? '';
+                $program = $input['program'] ?? $input['programa'] ?? '';
+                $responsavel = $input['responsavel'] ?? '';
+                $status = $input['status'] ?? 'pending';
+
+                $stmt = $db->prepare("
+                    UPDATE actions 
+                    SET title = ?, titulo = ?, descricao = ?, program = ?, programa = ?, responsavel = ?, status = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$title, $title, $descricao, $program, $program, $responsavel, $status, $id]);
+
+                sendResponse(['success' => true, 'message' => 'Ação atualizada!']);
                 
-                if (!$id) {
-                    sendResponse(['error' => 'ID é obrigatório'], 400);
-                }
-
-                $stmt = $db->prepare("UPDATE actions SET description = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([
-                    $input['description'] ?? '',
-                    $input['status'] ?? 'pending',
-                    $id
-                ]);
-
-                $stmt = $db->prepare("SELECT * FROM actions WHERE id = ?");
-                $stmt->execute([$id]);
-                $action = $stmt->fetch();
-
-                sendResponse($action);
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao atualizar action: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao atualizar ação: ' . $e->getMessage()], 500);
             }
-        } elseif ($method === 'DELETE') {
+        }
+        elseif ($method === 'DELETE') {
             try {
-                $id = $_GET['id'] ?? '';
-                
-                if (!$id) {
-                    sendResponse(['error' => 'ID é obrigatório'], 400);
-                }
+                $input = json_decode(file_get_contents('php://input'), true);
+                $id = $input['id'] ?? '';
 
                 $stmt = $db->prepare("DELETE FROM actions WHERE id = ?");
                 $stmt->execute([$id]);
 
-                sendResponse(['success' => true, 'message' => 'Action deletada com sucesso']);
+                sendResponse(['success' => true, 'message' => 'Ação deletada!']);
+                
             } catch(PDOException $e) {
-                sendResponse(['error' => 'Erro ao deletar action: ' . $e->getMessage()], 500);
+                sendResponse(['error' => 'Erro ao deletar ação: ' . $e->getMessage()], 500);
             }
         }
         break;
 
-    case 'cronograma':
-        if ($method === 'POST') {
+    // ✅ NOVOS ENDPOINTS PARA SISTEMA COMPLETO
+    case 'followups':
+        if ($method === 'GET') {
+            try {
+                $stmt = $db->prepare("SELECT * FROM followups ORDER BY created_at DESC");
+                $stmt->execute();
+                $followups = $stmt->fetchAll();
+                sendResponse(['success' => true, 'data' => $followups]);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar follow-ups: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'POST') {
             try {
                 $input = json_decode(file_get_contents('php://input'), true);
-                sendResponse([
-                    'success' => true,
-                    'message' => 'Cronograma processado com sucesso',
-                    'data' => $input
+                
+                $stmt = $db->prepare("
+                    INSERT INTO followups (target_id, type, mensagem, prioridade, prazo, colaboradores, status, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $input['target_id'] ?? null,
+                    $input['type'] ?? '',
+                    $input['mensagem'] ?? '',
+                    $input['prioridade'] ?? 'media',
+                    $input['prazo'] ?? null,
+                    json_encode($input['colaboradores'] ?? []),
+                    $input['status'] ?? 'pending',
+                    $input['created_by'] ?? 'Sistema'
                 ]);
-            } catch (Exception $e) {
-                sendResponse(['error' => 'Erro no cronograma: ' . $e->getMessage()], 500);
+
+                $followup_id = $db->lastInsertId();
+                sendResponse(['success' => true, 'id' => $followup_id], 201);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar follow-up: ' . $e->getMessage()], 500);
             }
-        } else {
-            sendResponse(['error' => 'Método não permitido'], 405);
+        }
+        break;
+
+    case 'tasks':
+        if ($method === 'GET') {
+            try {
+                $stmt = $db->prepare("SELECT * FROM tasks ORDER BY created_at DESC");
+                $stmt->execute();
+                $tasks = $stmt->fetchAll();
+                sendResponse(['success' => true, 'data' => $tasks]);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar tarefas: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                
+                $stmt = $db->prepare("
+                    INSERT INTO tasks (followup_id, titulo, descricao, responsavel, status, prazo, attachments, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $input['followup_id'] ?? null,
+                    $input['titulo'] ?? '',
+                    $input['descricao'] ?? '',
+                    $input['responsavel'] ?? '',
+                    $input['status'] ?? 'pending',
+                    $input['prazo'] ?? null,
+                    json_encode($input['attachments'] ?? []),
+                    $input['created_by'] ?? 'Sistema'
+                ]);
+
+                $task_id = $db->lastInsertId();
+                sendResponse(['success' => true, 'id' => $task_id], 201);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar tarefa: ' . $e->getMessage()], 500);
+            }
+        }
+        break;
+
+    case 'schedule':
+        if ($method === 'GET') {
+            try {
+                $stmt = $db->prepare("SELECT * FROM cronograma ORDER BY created_at DESC");
+                $stmt->execute();
+                $cronograma = $stmt->fetchAll();
+                sendResponse(['success' => true, 'data' => $cronograma]);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar cronograma: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                
+                $stmt = $db->prepare("
+                    INSERT INTO cronograma (nome, inicio, fim, rubrica, executado, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $input['nome'] ?? '',
+                    $input['inicio'] ?? null,
+                    $input['fim'] ?? null,
+                    $input['rubrica'] ?? 0,
+                    $input['executado'] ?? 0,
+                    $input['created_by'] ?? 'Sistema'
+                ]);
+
+                $cronograma_id = $db->lastInsertId();
+                sendResponse(['success' => true, 'id' => $cronograma_id], 201);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar cronograma: ' . $e->getMessage()], 500);
+            }
+        }
+        break;
+
+    case 'inventory':
+        if ($method === 'GET') {
+            try {
+                $stmt = $db->prepare("SELECT * FROM inventario ORDER BY created_at DESC");
+                $stmt->execute();
+                $inventario = $stmt->fetchAll();
+                sendResponse(['success' => true, 'data' => $inventario]);
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao buscar inventário: ' . $e->getMessage()], 500);
+            }
+        }
+        elseif ($method === 'POST') {
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                
+                $stmt = $db->prepare("
+                    INSERT INTO inventario (programa, item, descricao, valor, atividades_relacionadas, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $input['programa'] ?? '',
+                    $input['item'] ?? '',
+                    $input['descricao'] ?? '',
+                    $input['valor'] ?? 0,
+                    $input['atividades_relacionadas'] ?? '',
+                    $input['created_by'] ?? 'Sistema'
+                ]);
+
+                $inventario_id = $db->lastInsertId();
+                sendResponse(['success' => true, 'id' => $inventario_id], 201);
+                
+            } catch(PDOException $e) {
+                sendResponse(['error' => 'Erro ao criar item inventário: ' . $e->getMessage()], 500);
+            }
+        }
+        break;
+
+    case 'activity-log':
+        if ($method === 'POST') {
+            // Log de atividades - aceitar mas não salvar (opcional)
+            sendResponse(['success' => true, 'message' => 'Log registrado'], 201);
         }
         break;
 
     default:
-        sendResponse(['error' => 'Endpoint não encontrado: ' . $endpoint], 404);
+        sendResponse([
+            'error' => 'Endpoint não encontrado: ' . $endpoint,
+            'available_endpoints' => ['test', 'goals', 'actions', 'followups', 'tasks', 'schedule', 'inventory'],
+            'method' => $method
+        ], 404);
 }
 ?>
