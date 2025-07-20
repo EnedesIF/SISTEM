@@ -1,19 +1,15 @@
 <?php
-$db_config = [
-    'host'   => 'ep-mute-sound-aeprb25b-pooler.c-2.us-east-2.aws.neon.tech',
-    'dbname' => 'neondb',
-    'user'   => 'neondb_owner',
-    'pass'   => 'npg_wX2ZKyd9tRbe'
-];
+$host = 'dpg-d1u47ber433s73ebqecg-a';         // Host
+$db   = 'enedesifb';                          // Database name
+$user = 'enedesifb_user';                     // Usuário
+$pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';   // Senha
+$port = '5432';                               // Porta padrão
 
 try {
-    $pdo = new PDO(
-        "pgsql:host={$db_config['host']};dbname={$db_config['dbname']};sslmode=require",
-        $db_config['user'],
-        $db_config['pass'],
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ]);
 } catch (PDOException $e) {
-    die("Erro na conexão com o banco: " . $e->getMessage());
+    die("Erro na conexão: " . $e->getMessage());
 }
 ?>
