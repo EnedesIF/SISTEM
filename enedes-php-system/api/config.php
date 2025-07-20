@@ -1,9 +1,9 @@
 <?php
-$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com';
-$db   = 'enedesifb';
-$user = 'enedesifb_user';
-$pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';
-$port = '5432';
+$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com'; // Host do banco
+$db   = 'enedesifb2';                                           // Nome do banco correto
+$user = 'enedesifb_user';                                        // Usuário do banco
+$pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';                     // Senha correta
+$port = '5432';                                                  // Porta padrão PostgreSQL
 
 try {
     $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass, [
