@@ -1,9 +1,9 @@
 <?php
-$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com'; // Host COMPLETO
-$db   = 'enedesifb';                          // Database name
-$user = 'enedesifb_user';                     // Usuário
-$pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';   // Senha
-$port = '5432';                               // Porta padrão
+$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com';
+$db   = 'enedesifb';
+$user = 'enedesifb_user';
+$pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';
+$port = '5432';
 
 try {
     $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass, [
