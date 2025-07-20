@@ -1,6 +1,6 @@
 <?php
 $host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com'; // Host do banco
-$db   = 'enedesifb2';                                           // Nome do banco correto
+$db   = 'enedesifb';                                           // Banco correto conforme Render
 $user = 'enedesifb_user';                                        // Usuário do banco
 $pass = 'E8kQWf5R9eAUV6XZJBeYNVcgBdmcTjUB';                     // Senha correta
 $port = '5432';                                                  // Porta padrão PostgreSQL
