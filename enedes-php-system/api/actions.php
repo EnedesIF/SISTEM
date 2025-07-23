@@ -1,4 +1,7 @@
 <?php
+// actions.php - Configurado para Render PostgreSQL
+require_once 'config.php';
+
 function inserirAction($pdo) {
     $data = json_decode(file_get_contents('php://input'), true);
 
@@ -22,23 +25,24 @@ function inserirAction($pdo) {
     }
 
     try {
-        // CORRIGIDO: usar tabela "acoes" em vez de "actions"
-        $stmt = $pdo->prepare("INSERT INTO acoes (title, descricao, programa, responsavel, status, created_at)
-            VALUES (:title, :descricao, :programa, :responsavel, :status, NOW())");
+        // ✅ USAR TABELA "actions" (conforme frontend espera)
+        $stmt = $pdo->prepare("INSERT INTO actions (titulo, descricao, programa, responsavel, status, created_at)
+            VALUES (:titulo, :descricao, :programa, :responsavel, :status, NOW()) RETURNING id");
         
         $stmt->execute([
-            ':title' => $title,
+            ':titulo' => $title,
             ':descricao' => $descricao,
             ':programa' => $programa,
             ':responsavel' => $responsavel,
             ':status' => $status
         ]);
 
-        $id = $pdo->lastInsertId();
+        $id = $stmt->fetchColumn();
         echo json_encode([
             "success" => true, 
             "id" => $id,
-            "message" => "Ação inserida com sucesso"
+            "message" => "Ação inserida no Render PostgreSQL com sucesso",
+            "database_provider" => "Render PostgreSQL"
         ]);
     } catch (PDOException $e) {
         http_response_code(500);
@@ -48,10 +52,14 @@ function inserirAction($pdo) {
 
 function listarActions($pdo) {
     try {
-        // CORRIGIDO: usar tabela "acoes" em vez de "actions"
-        $stmt = $pdo->query("SELECT * FROM acoes ORDER BY created_at DESC");
+        // ✅ USAR TABELA "actions"
+        $stmt = $pdo->query("SELECT * FROM actions ORDER BY created_at DESC");
         $actions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(["success" => true, "data" => $actions]);
+        echo json_encode([
+            "success" => true, 
+            "data" => $actions,
+            "database_provider" => "Render PostgreSQL"
+        ]);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(["error" => "Erro ao listar ações: " . $e->getMessage()]);
@@ -68,10 +76,10 @@ function atualizarAction($pdo) {
     }
 
     try {
-        // CORRIGIDO: usar tabela "acoes" em vez de "actions"
-        $stmt = $pdo->prepare("UPDATE acoes SET title = :title, descricao = :descricao, programa = :programa, responsavel = :responsavel, status = :status WHERE id = :id");
+        // ✅ USAR TABELA "actions"
+        $stmt = $pdo->prepare("UPDATE actions SET titulo = :titulo, descricao = :descricao, programa = :programa, responsavel = :responsavel, status = :status, updated_at = NOW() WHERE id = :id");
         $stmt->execute([
-            ':title' => $data['titulo'] ?? $data['title'],
+            ':titulo' => $data['titulo'] ?? $data['title'],
             ':descricao' => $data['descricao'],
             ':programa' => $data['programa'],
             ':responsavel' => $data['responsavel'],
@@ -79,7 +87,11 @@ function atualizarAction($pdo) {
             ':id' => $data['id']
         ]);
 
-        echo json_encode(["success" => true, "message" => "Ação atualizada"]);
+        echo json_encode([
+            "success" => true, 
+            "message" => "Ação atualizada no Render PostgreSQL",
+            "database_provider" => "Render PostgreSQL"
+        ]);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(["error" => "Erro ao atualizar ação: " . $e->getMessage()]);
@@ -96,15 +108,18 @@ function deletarAction($pdo) {
     }
 
     try {
-        // CORRIGIDO: usar tabela "acoes" em vez de "actions"
-        $stmt = $pdo->prepare("DELETE FROM acoes WHERE id = :id");
+        // ✅ USAR TABELA "actions"
+        $stmt = $pdo->prepare("DELETE FROM actions WHERE id = :id");
         $stmt->execute([':id' => $data['id']]);
 
-        echo json_encode(["success" => true, "message" => "Ação excluída"]);
+        echo json_encode([
+            "success" => true, 
+            "message" => "Ação excluída do Render PostgreSQL",
+            "database_provider" => "Render PostgreSQL"
+        ]);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(["error" => "Erro ao excluir ação: " . $e->getMessage()]);
     }
 }
 ?>
-
