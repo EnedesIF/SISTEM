@@ -1,13 +1,12 @@
 <?php
 // config.php - Configuração EXCLUSIVA para Render PostgreSQL
-// Baseado nas credenciais da sua imagem
+// ✅ CREDENCIAIS RENDER POSTGRESQL (da sua imagem)
 
-// ✅ CREDENCIAIS RENDER POSTGRESQL (conforme sua imagem)
-$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com'; // External URL
-$db   = 'enedesifb';                                              // Database name
-$user = 'enedesifb_user';                                         // Username
-$pass = 'E8kOWf5R9eAUV6XZJBeYNVcgBdmcTJUB';                      // Password
-$port = '5432';                                                   // Port
+$host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com';
+$db   = 'enedesifb';
+$user = 'enedesifb_user';
+$pass = 'E8kOWf5R9eAUV6XZJBeYNVcgBdmcTJUB';
+$port = '5432';
 
 try {
     $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass, [
@@ -27,7 +26,7 @@ try {
     die("Erro na conexão com Render PostgreSQL: " . $e->getMessage());
 }
 
-// Informações de diagnóstico (apenas para debug)
+// Informações de conexão
 $connection_info = [
     'provider' => 'Render PostgreSQL',
     'hostname' => $host,
@@ -38,7 +37,6 @@ $connection_info = [
     'timestamp' => date('Y-m-d H:i:s')
 ];
 
-// Função auxiliar para obter informações da conexão
 function getConnectionInfo() {
     global $connection_info;
     return $connection_info;
