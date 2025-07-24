@@ -2,7 +2,9 @@ FROM php:8.1-apache
 
 # Instalar dependências PostgreSQL
 RUN apt-get update && apt-get install -y libpq-dev \
-    && docker-php-ext-install pdo pdo_pgsql
+    && docker-php-ext-install pdo pdo_pgsql \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Habilitar mod_rewrite Apache
 RUN a2enmod rewrite
@@ -10,7 +12,7 @@ RUN a2enmod rewrite
 # Configurar DirectoryIndex para aceitar index.html e index.php
 RUN echo "DirectoryIndex index.html index.php" >> /etc/apache2/apache2.conf
 
-# Copiar todos os arquivos do projeto
+# Copiar TODOS os arquivos do projeto para Apache
 COPY . /var/www/html/
 
 # Ajustar permissões
