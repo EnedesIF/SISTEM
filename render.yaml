@@ -1,10 +1,12 @@
 services:
   - type: web
     name: sistem-enedes
-    env: native
+    env: docker
     plan: free
-    buildCommand: echo "PHP nativo - sem build necessário"
-    startCommand: echo "Usando servidor PHP nativo do Render"
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
-      - key: PHP_VERSION
-        value: "8.1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: enedesifb
+          property: connectionString
