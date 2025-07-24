@@ -1,5 +1,5 @@
 <?php
-// api.php - Backend API para Sistema ENEDES - Corrigido para PostgreSQL
+// api.php - Backend API para Sistema ENEDES - CORRIGIDO para PostgreSQL
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -11,7 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Database configuration - PostgreSQL Render
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Database configuration - PostgreSQL Render - CORRIGIDO
 function getDbConnection() {
     $database_url = getenv('DATABASE_URL');
     
@@ -21,32 +24,40 @@ function getDbConnection() {
         $dbname = 'enedesifb';
         $username = 'enedesifb_user';
         $password = 'E8kOWf5R9eAUV6XZJBeYNVcgBdmcTJUB';
-        $port = '5432';
+        $port = 5432;
         
         $database_url = "postgresql://$username:$password@$host:$port/$dbname";
     }
     
     try {
         $db = parse_url($database_url);
-        $pdo = new PDO(
-            "pgsql:host={$db['host']};port={$db['port']};dbname=" . ltrim($db['path'], '/'),
-            $db['user'],
-            $db['pass'],
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]
-        );
         
-        // ✅ REMOVIDO: autocommit (não existe no PostgreSQL)
-        // PostgreSQL usa autocommit por padrão
+        // ✅ CORREÇÃO: Verificar se as chaves existem antes de usar
+        $host = $db['host'] ?? 'localhost';
+        $port = isset($db['port']) ? (int)$db['port'] : 5432; // ✅ CAST para int e default
+        $dbname = isset($db['path']) ? ltrim($db['path'], '/') : 'enedesifb';
+        $username = $db['user'] ?? '';
+        $password = $db['pass'] ?? '';
+        
+        // ✅ DSN corrigido com verificações
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
+        
+        $pdo = new PDO($dsn, $username, $password, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::ATTR_TIMEOUT => 30
+        ]);
+        
+        // ✅ REMOVIDO: autocommit (PostgreSQL não suporta)
+        // PostgreSQL usa autocommit por padrão - não precisa configurar
         
         // Create tables if they don't exist
         createTablesIfNotExist($pdo);
         
         return $pdo;
     } catch (PDOException $e) {
+        error_log("Database connection error: " . $e->getMessage());
         throw new Exception("Database connection failed: " . $e->getMessage());
     }
 }
@@ -63,8 +74,8 @@ function createTablesIfNotExist($pdo) {
                 indicadores JSONB DEFAULT \'[]\',
                 status VARCHAR(50) DEFAULT \'ativo\',
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )',
         'actions' => '
             CREATE TABLE IF NOT EXISTS actions (
@@ -75,8 +86,8 @@ function createTablesIfNotExist($pdo) {
                 responsavel VARCHAR(255),
                 status VARCHAR(50) DEFAULT \'pending\',
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )',
         'followups' => '
             CREATE TABLE IF NOT EXISTS followups (
@@ -90,7 +101,7 @@ function createTablesIfNotExist($pdo) {
                 attachments JSONB DEFAULT \'[]\',
                 status VARCHAR(50) DEFAULT \'pending\',
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )',
         'tasks' => '
             CREATE TABLE IF NOT EXISTS tasks (
@@ -103,7 +114,7 @@ function createTablesIfNotExist($pdo) {
                 prazo DATE,
                 attachments JSONB DEFAULT \'[]\',
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )',
         'cronograma' => '
             CREATE TABLE IF NOT EXISTS cronograma (
@@ -114,7 +125,7 @@ function createTablesIfNotExist($pdo) {
                 rubrica DECIMAL(15,2) DEFAULT 0,
                 executado DECIMAL(15,2) DEFAULT 0,
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )',
         'inventario' => '
             CREATE TABLE IF NOT EXISTS inventario (
@@ -125,7 +136,7 @@ function createTablesIfNotExist($pdo) {
                 valor DECIMAL(15,2) DEFAULT 0,
                 atividades_relacionadas TEXT,
                 created_by VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )'
     ];
     
@@ -146,27 +157,50 @@ try {
     
     switch ($endpoint) {
         case 'test':
-            // Count existing data for test response
-            $metasCount = $pdo->query('SELECT COUNT(*) FROM metas')->fetchColumn();
-            $actionsCount = $pdo->query('SELECT COUNT(*) FROM actions')->fetchColumn();
-            
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'ENEDES API funcionando perfeitamente com PostgreSQL!',
-                'timestamp' => date('Y-m-d H:i:s'),
-                'method' => $method,
-                'php_version' => PHP_VERSION,
-                'database_connected' => true,
-                'config_method' => getenv('DATABASE_URL') ? 'Environment Variable (Secure)' : 'Fallback Config',
-                'environment' => 'Production',
-                'database_type' => 'PostgreSQL',
-                'render_connected' => 'Yes',
-                'tables_auto_created' => 'Yes',
-                'current_data' => [
-                    'metas_count' => (int)$metasCount,
-                    'actions_count' => (int)$actionsCount
-                ]
-            ]);
+            // Test database connection and show detailed info
+            try {
+                // Test basic query
+                $stmt = $pdo->query("SELECT 1 as test_number, NOW() as current_time, version() as pg_version");
+                $test_result = $stmt->fetch();
+                
+                // Count existing data for test response
+                $metasCount = $pdo->query('SELECT COUNT(*) FROM metas')->fetchColumn();
+                $actionsCount = $pdo->query('SELECT COUNT(*) FROM actions')->fetchColumn();
+                
+                // Test insert/delete to verify write permissions
+                $pdo->exec("CREATE TABLE IF NOT EXISTS test_connection (id SERIAL PRIMARY KEY, test_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+                $stmt = $pdo->prepare("INSERT INTO test_connection DEFAULT VALUES RETURNING id");
+                $stmt->execute();
+                $test_id = $stmt->fetchColumn();
+                $pdo->exec("DELETE FROM test_connection WHERE id = $test_id");
+                $pdo->exec("DROP TABLE IF EXISTS test_connection");
+                
+                echo json_encode([
+                    'status' => 'success',
+                    'message' => 'ENEDES API funcionando perfeitamente com PostgreSQL!',
+                    'timestamp' => date('Y-m-d H:i:s'),
+                    'method' => $method,
+                    'php_version' => PHP_VERSION,
+                    'database_connected' => true,
+                    'database_test' => $test_result,
+                    'config_method' => getenv('DATABASE_URL') ? 'Environment Variable (Secure)' : 'Fallback Config',
+                    'environment' => 'Production - Render',
+                    'database_type' => 'PostgreSQL',
+                    'render_connected' => 'Yes',
+                    'tables_auto_created' => 'Yes',
+                    'write_test' => 'Success',
+                    'current_data' => [
+                        'metas_count' => (int)$metasCount,
+                        'actions_count' => (int)$actionsCount
+                    ]
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            } catch (Exception $e) {
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Test failed: ' . $e->getMessage(),
+                    'timestamp' => date('Y-m-d H:i:s')
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            }
             break;
             
         case 'goals':
@@ -203,16 +237,22 @@ try {
                 'available_endpoints' => [
                     'test', 'goals', 'actions', 'followups', 
                     'tasks', 'cronograma', 'inventory'
-                ]
+                ],
+                'usage' => 'Add ?endpoint=ENDPOINT_NAME to your request'
             ]);
     }
     
 } catch (Exception $e) {
     http_response_code(500);
+    error_log("API Fatal Error: " . $e->getMessage());
     echo json_encode([
         'error' => 'Internal server error',
         'message' => $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
+        'timestamp' => date('Y-m-d H:i:s'),
+        'debug_info' => [
+            'line' => $e->getLine(),
+            'file' => basename($e->getFile())
+        ]
     ]);
 }
 
