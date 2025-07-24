@@ -2,256 +2,127 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+$diagnostic = [
+    'timestamp' => date('Y-m-d H:i:s'),
+    'server_info' => [
+        'php_version' => phpversion(),
+        'current_dir' => getcwd(),
+        'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'Not set',
+        'server_name' => $_SERVER['SERVER_NAME'] ?? 'Not set'
+    ],
+    'environment' => [],
+    'database' => [
+        'status' => 'not_tested',
+        'connection' => null,
+        'tables' => []
+    ],
+    'files' => [
+        'index.html' => file_exists('index.html'),
+        'api.php' => file_exists('api.php'),
+        'render.yaml' => file_exists('render.yaml'),
+        'Dockerfile' => file_exists('Dockerfile')
+    ]
+];
 
-// Função de conexão igual ao api.php
-function getDbConnection() {
-    $database_url = getenv('DATABASE_URL');
-    
-    if (!$database_url) {
-        $host = 'dpg-d1u47ber433s73ebqecg-a.oregon-postgres.render.com';
-        $dbname = 'enedesifb';
-        $username = 'enedesifb_user';
-        $password = 'E8kOWf5R9eAUV6XZJBeYNVcgBdmcTJUB';
-        $port = 5432;
-        $database_url = "postgresql://$username:$password@$host:$port/$dbname";
-    }
-    
-    $db = parse_url($database_url);
-    $host = $db['host'] ?? 'localhost';
-    $port = isset($db['port']) ? (int)$db['port'] : 5432;
-    $dbname = isset($db['path']) ? ltrim($db['path'], '/') : 'enedesifb';
-    $username = $db['user'] ?? '';
-    $password = $db['pass'] ?? '';
-    
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
-    
-    return new PDO($dsn, $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::ATTR_TIMEOUT => 30
-    ]);
+// Verificar variáveis de ambiente
+$env_vars = ['DATABASE_URL', 'PHP_VERSION'];
+foreach ($env_vars as $var) {
+    $diagnostic['environment'][$var] = getenv($var) ?: 'Not set';
 }
 
-function testInsertWithCorrectStructure($pdo) {
-    $results = [];
-    
-    try {
-        // 1. Verificar estrutura da tabela metas
-        $stmt = $pdo->query("
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'metas' AND table_schema = 'public'
-        ");
-        $metas_columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        $results['metas_columns'] = $metas_columns;
-        
-        // 2. Testar inserção usando as colunas corretas
-        $has_title = in_array('title', $metas_columns);
-        $has_titulo = in_array('titulo', $metas_columns);
-        
-        if ($has_title) {
-            // Usar 'title' se existir
-            $stmt = $pdo->prepare("
-                INSERT INTO metas (title, objetivo, status) 
-                VALUES (?, ?, ?) 
-                RETURNING id
-            ");
-            $stmt->execute([
-                'Teste de Diagnóstico - ' . date('H:i:s'),
-                'Verificar funcionamento da API',
-                'ativo'
-            ]);
-            $test_id = $stmt->fetchColumn();
-            
-            // Ler o registro
-            $stmt = $pdo->prepare("SELECT * FROM metas WHERE id = ?");
-            $stmt->execute([$test_id]);
-            $test_record = $stmt->fetch();
-            
-            // Limpar teste
-            $pdo->prepare("DELETE FROM metas WHERE id = ?")->execute([$test_id]);
-            
-            $results['test_with_title'] = [
-                'status' => 'SUCCESS',
-                'inserted_record' => $test_record
-            ];
-            
-        } elseif ($has_titulo) {
-            // Usar 'titulo' se 'title' não existir
-            $stmt = $pdo->prepare("
-                INSERT INTO metas (titulo, descricao, status) 
-                VALUES (?, ?, ?) 
-                RETURNING id
-            ");
-            $stmt->execute([
-                'Teste de Diagnóstico - ' . date('H:i:s'),
-                'Verificar funcionamento da API',
-                'ativo'
-            ]);
-            $test_id = $stmt->fetchColumn();
-            
-            // Ler o registro
-            $stmt = $pdo->prepare("SELECT * FROM metas WHERE id = ?");
-            $stmt->execute([$test_id]);
-            $test_record = $stmt->fetch();
-            
-            // Limpar teste
-            $pdo->prepare("DELETE FROM metas WHERE id = ?")->execute([$test_id]);
-            
-            $results['test_with_titulo'] = [
-                'status' => 'SUCCESS',
-                'inserted_record' => $test_record
-            ];
-        } else {
-            $results['test_insert'] = [
-                'status' => 'FAILED',
-                'error' => 'Nem title nem titulo encontrados na tabela metas'
-            ];
-        }
-        
-        // 3. Testar tabela actions
-        $stmt = $pdo->query("
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'actions' AND table_schema = 'public'
-        ");
-        $actions_columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        $results['actions_columns'] = $actions_columns;
-        
-        if (in_array('titulo', $actions_columns)) {
-            $stmt = $pdo->prepare("
-                INSERT INTO actions (titulo, descricao, status) 
-                VALUES (?, ?, ?) 
-                RETURNING id
-            ");
-            $stmt->execute([
-                'Ação de Teste - ' . date('H:i:s'),
-                'Verificar inserção em actions',
-                'pending'
-            ]);
-            $test_id = $stmt->fetchColumn();
-            
-            // Ler e limpar
-            $stmt = $pdo->prepare("SELECT * FROM actions WHERE id = ?");
-            $stmt->execute([$test_id]);
-            $test_record = $stmt->fetch();
-            $pdo->prepare("DELETE FROM actions WHERE id = ?")->execute([$test_id]);
-            
-            $results['test_actions'] = [
-                'status' => 'SUCCESS',
-                'inserted_record' => $test_record
-            ];
-        }
-        
-    } catch (Exception $e) {
-        $results['test_insert'] = [
-            'status' => 'FAILED',
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ];
-    }
-    
-    return $results;
-}
-
-function runDatabaseDiagnostic($pdo) {
-    $diagnostic = [
-        'timestamp' => date('Y-m-d H:i:s'),
-        'connection_test' => null,
-        'structure_analysis' => null,
-        'insert_test' => null,
-        'recommendations' => []
-    ];
-    
-    try {
-        // 1. Teste de conexão
-        $stmt = $pdo->query("SELECT version(), current_database(), current_user");
-        $connection_info = $stmt->fetch();
-        $diagnostic['connection_test'] = [
-            'status' => 'SUCCESS',
-            'info' => $connection_info
-        ];
-        
-        // 2. Análise de estrutura
-        $diagnostic['structure_analysis'] = testInsertWithCorrectStructure($pdo);
-        
-        // 3. Contagem de registros
-        $tables = ['metas', 'actions', 'cronograma', 'followups', 'tasks', 'inventario'];
-        $counts = [];
-        foreach ($tables as $table) {
-            try {
-                $stmt = $pdo->query("SELECT COUNT(*) FROM $table");
-                $counts[$table] = $stmt->fetchColumn();
-            } catch (Exception $e) {
-                $counts[$table] = "ERROR: " . $e->getMessage();
-            }
-        }
-        $diagnostic['table_counts'] = $counts;
-        
-        // 4. Recomendações
-        $metas_columns = $diagnostic['structure_analysis']['metas_columns'] ?? [];
-        
-        if (in_array('title', $metas_columns) && !in_array('titulo', $metas_columns)) {
-            $diagnostic['recommendations'][] = "Considere adicionar coluna 'titulo' na tabela metas para compatibilidade";
-        }
-        
-        if (in_array('titulo', $metas_columns) && in_array('title', $metas_columns)) {
-            $diagnostic['recommendations'][] = "✅ Tabela metas tem both 'title' e 'titulo' - compatibilidade total";
-        }
-        
-        $diagnostic['overall_status'] = 'HEALTHY';
-        
-    } catch (Exception $e) {
-        $diagnostic['connection_test'] = [
-            'status' => 'FAILED',
-            'error' => $e->getMessage()
-        ];
-        $diagnostic['overall_status'] = 'FAILED';
-    }
-    
-    return $diagnostic;
-}
-
-// Executar baseado no parâmetro
+// Testar conexão com banco
 try {
-    $pdo = getDbConnection();
-    
-    $test = $_GET['test'] ?? '1';
-    
-    switch ($test) {
-        case '1':
-        case 'full':
-            $result = runDatabaseDiagnostic($pdo);
-            break;
-            
-        case 'structure':
-            $result = testInsertWithCorrectStructure($pdo);
-            break;
-            
-        case 'simple':
-            $stmt = $pdo->query("SELECT 'Database OK' as status, NOW() as timestamp");
-            $result = [
-                'status' => 'SUCCESS',
-                'data' => $stmt->fetch(),
-                'message' => 'Conexão PostgreSQL funcionando'
-            ];
-            break;
-            
-        default:
-            $result = ['error' => 'Parâmetro test inválido. Use: ?test=1, ?test=structure ou ?test=simple'];
+    $database_url = getenv('DATABASE_URL');
+    if ($database_url) {
+        $db_parts = parse_url($database_url);
+        
+        $host = $db_parts['host'];
+        $port = $db_parts['port'];
+        $user = $db_parts['user'];
+        $pass = $db_parts['pass'];
+        $dbname = ltrim($db_parts['path'], '/');
+        
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
+        $pdo = new PDO($dsn, $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]);
+        
+        $diagnostic['database']['status'] = 'connected';
+        $diagnostic['database']['connection'] = [
+            'host' => $host,
+            'port' => $port,
+            'database' => $dbname,
+            'user' => $user
+        ];
+        
+        // Verificar tabelas existentes
+        $stmt = $pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $diagnostic['database']['tables'] = $tables;
+        
+        // Verificar estrutura da tabela metas se existir
+        if (in_array('metas', $tables)) {
+            $stmt = $pdo->query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'metas' ORDER BY ordinal_position");
+            $columns = $stmt->fetchAll();
+            $diagnostic['database']['metas_structure'] = $columns;
+        }
+        
+    } else {
+        $diagnostic['database']['status'] = 'no_database_url';
     }
-    
-    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        'status' => 'FAILED',
-        'error' => $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    $diagnostic['database']['status'] = 'error';
+    $diagnostic['database']['error'] = $e->getMessage();
+}
+
+// Verificar se é requisição AJAX
+if (isset($_GET['format']) && $_GET['format'] === 'html') {
+    header('Content-Type: text/html');
+    echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>ENEDES System Diagnostic</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        h2 { color: #333; margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 ENEDES System Diagnostic</h1>";
+    
+    echo "<div class='section " . ($diagnostic['database']['status'] === 'connected' ? 'success' : 'error') . "'>";
+    echo "<h2>Database Status: " . $diagnostic['database']['status'] . "</h2>";
+    if ($diagnostic['database']['status'] === 'connected') {
+        echo "<p>✅ Connected successfully</p>";
+        echo "<p><strong>Tables found:</strong> " . implode(', ', $diagnostic['database']['tables']) . "</p>";
+    } else {
+        echo "<p>❌ Connection failed</p>";
+        if (isset($diagnostic['database']['error'])) {
+            echo "<p><strong>Error:</strong> " . $diagnostic['database']['error'] . "</p>";
+        }
+    }
+    echo "</div>";
+    
+    echo "<div class='section'>";
+    echo "<h2>Files Status</h2>";
+    foreach ($diagnostic['files'] as $file => $exists) {
+        echo "<p>" . ($exists ? "✅" : "❌") . " $file</p>";
+    }
+    echo "</div>";
+    
+    echo "<div class='section'>";
+    echo "<h2>Raw Diagnostic Data</h2>";
+    echo "<pre>" . json_encode($diagnostic, JSON_PRETTY_PRINT) . "</pre>";
+    echo "</div>";
+    
+    echo "</body></html>";
+} else {
+    echo json_encode($diagnostic, JSON_PRETTY_PRINT);
 }
 ?>
